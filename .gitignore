@@ -1,0 +1,7 @@
+.env
+menu.lock
+state.json
+logs.txt
+*.tmp
+__pycache__/
+*.pyc
