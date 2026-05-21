@@ -14,8 +14,20 @@ actif). Tu peux t'inspirer de l'historique fourni des recettes. Tu recevras en
 entrée : Le numéro de semaine cible, l'année, l'historique des menus des
 dernières semaines et la liste des ingrédients de saison actuels, ces deux
 derniers au format JSON. L'output attendu est le bloc semaine pour la semaine
-suivante. Le bloc doit respecter le format du json menus qui t'a été fourni. Il
-y sera ultérieurement intégré.
+suivante. Le bloc doit respecter le format du json suivant :
+
+{
+  "numéro": <numéro_de_semaine_cible>,
+  "menu": [
+    {
+      "nom": "nom du plat",
+      "ingrédients": [
+        { "nom": "ingrédient", "quantité": "quantité" }
+      ]
+    }
+  ]
+}
+Renvoie uniquement ce JSON, rien d'autre.
 
 ## Prompt 2 — Formatage message Telegram
 

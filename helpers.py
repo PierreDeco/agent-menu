@@ -152,6 +152,7 @@ def call_llm(system_prompt, user_message, max_retries=3):
                 messages=[{"role": "user", "content": user_message}],
             )
             text = response.content[0].text
+            logging.info(f"Retour du LLM : {text}")
             logging.info("LLM ok (%d tokens)", response.usage.output_tokens)
             return text
         except Exception as e:
