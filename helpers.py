@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import logging.handlers
 import fcntl
 import re
 import time
@@ -49,7 +50,12 @@ def setup_logging():
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
-            logging.FileHandler(LOG_PATH),
+            logging.handlers.RotatingFileHandler(
+                LOG_PATH,
+                maxBytes=1_000_000,
+                backupCount=3,
+                encoding="utf-8",
+            ),
             logging.StreamHandler(),
         ],
     )
@@ -169,11 +175,17 @@ class LockFile:
             logging.info("Lock libéré %s", self.path)
 
 
+_client = None
+
+
 def _anthropic_client():
-    key = os.getenv("ANTHROPIC_API_KEY")
-    if not key:
-        raise RuntimeError("ANTHROPIC_API_KEY non définie")
-    return anthropic.Anthropic(api_key=key)
+    global _client
+    if _client is None:
+        key = os.getenv("ANTHROPIC_API_KEY")
+        if not key:
+            raise RuntimeError("ANTHROPIC_API_KEY non définie")
+        _client = anthropic.Anthropic(api_key=key)
+    return _client
 
 
 def call_llm(system_prompt, user_message, max_retries=3):
@@ -260,17 +272,31 @@ def find_best_match(query, candidates, threshold=70):
     return result[0] if result else None
 
 
+_PROMPTS = None
+
+
 def load_prompt(num):
-    path = BASE_DIR / "prompts.md"
-    text = path.read_text(encoding="utf-8")
-    pattern = rf"^## Prompt {num}\b.*?$"
-    match = re.search(pattern, text, re.MULTILINE)
-    if not match:
-        msg = f"Prompt #{num} introuvable dans {path}"
+    global _PROMPTS
+    if _PROMPTS is None:
+        path = BASE_DIR / "prompts.md"
+        text = path.read_text(encoding="utf-8")
+        headers = list(re.finditer(r"^## Prompt (\d+)\b.*?$", text, re.MULTILINE))
+        _PROMPTS = {}
+        for i, match in enumerate(headers):
+            start = match.end()
+            end = headers[i + 1].start() if i + 1 < len(headers) else len(text)
+            _PROMPTS[int(match.group(1))] = text[start:end].strip()
+    if num not in _PROMPTS:
+        msg = f"Prompt #{num} introuvable dans prompts.md"
         logging.error(msg)
         raise ValueError(msg)
-    start = match.end()
-    rest = text[start:]
-    next_match = re.search(r"^## Prompt \d+\b", rest, re.MULTILINE)
-    end = start + next_match.start() if next_match else len(text)
-    return text[start:end].strip()
+    return _PROMPTS[num]
+
+
+def find_week_entry(menus, year, week):
+    for year_entry in menus.get("Année", []):
+        if year_entry.get("numéro") == year:
+            for week_entry in year_entry.get("Semaine", []):
+                if week_entry.get("numéro") == week:
+                    return week_entry
+    return None

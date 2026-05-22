@@ -18,15 +18,6 @@ from helpers import (
 )
 
 
-def collect_used_names(menus):
-    names = []
-    for year_entry in menus.get("Année", []):
-        for week_entry in year_entry.get("Semaine", []):
-            for recipe in week_entry.get("menu", []):
-                names.append(recipe["nom"])
-    return names
-
-
 def save_week(menus, year, week, recipes):
     year_entry = None
     for entry in menus.get("Année", []):
@@ -62,16 +53,12 @@ def main():
         try:
             menus = load_menus()
             seasons = load_seasons()
-
-            # used = collect_used_names(menus)
-            # used_str = ", ".join(f'"{n}"' for n in used) if used else "aucun"
             ingredients = ", ".join(seasons.get(season, []))
 
             prompt1 = load_prompt(1)
             msg1 = (
                 f"Génère un menu de 4 recettes pour la semaine {week} ({month_name} {year}).\n"
-                f"Saison : {season}. Ingrédients de saison : {ingredients}.\n"
-                # f"Plats déjà utilisés (à ne pas répéter) : {used_str}."
+                f"Saison : {season}. Ingrédients de saison : {ingredients}."
             )
             recipes_json = call_llm(prompt1, msg1)
             parsed = extract_json(recipes_json)

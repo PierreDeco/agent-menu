@@ -10,11 +10,10 @@ un féculent, une protéine), et généralement végétariens. Occasionnellement
 peux proposer un plat non végétarien (typiquement une fois par semaine, grand
 maximum deux fois). Ces plats doivent pouvoir être cuisinés en 30min d'activité
 max (le temps de cuisson peut faire dépasser les 30min, ce n'est pas un temps
-actif). Tu peux t'inspirer de l'historique fourni des recettes. Tu recevras en
-entrée : Le numéro de semaine cible, l'année, l'historique des menus des
-dernières semaines et la liste des ingrédients de saison actuels, ces deux
-derniers au format JSON. L'output attendu est le bloc semaine pour la semaine
-suivante. Le bloc doit respecter le format du json suivant :
+actif). Tu recevras en entrée : le numéro de semaine cible, l'année, la saison
+et la liste des ingrédients de saison actuels. L'output attendu est le bloc
+semaine pour la semaine suivante. Le bloc doit respecter le format du json
+suivant :
 
 {
   "numéro": <numéro_de_semaine_cible>,

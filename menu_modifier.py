@@ -19,30 +19,26 @@ from helpers import (
     load_state,
     save_state,
     find_best_match,
+    find_week_entry,
     normalize_recipe,
 )
 
 
 def get_current_week_menu(menus, year, week):
-    for year_entry in menus.get("Année", []):
-        if year_entry.get("numéro") == year:
-            for week_entry in year_entry.get("Semaine", []):
-                if week_entry.get("numéro") == week:
-                    return week_entry.get("menu", [])
-    return None
+    entry = find_week_entry(menus, year, week)
+    return entry.get("menu", []) if entry else None
 
 
 def replace_recipe_in_menu(menus, year, week, original_name, new_recipe):
-    for year_entry in menus.get("Année", []):
-        if year_entry.get("numéro") == year:
-            for week_entry in year_entry.get("Semaine", []):
-                if week_entry.get("numéro") == week:
-                    menu = week_entry.get("menu", [])
-                    for i, recipe in enumerate(menu):
-                        if recipe.get("nom") == original_name:
-                            menu[i] = new_recipe
-                            save_menus(menus)
-                            return True
+    entry = find_week_entry(menus, year, week)
+    if entry is None:
+        return False
+    menu = entry.get("menu", [])
+    for i, recipe in enumerate(menu):
+        if recipe.get("nom") == original_name:
+            menu[i] = new_recipe
+            save_menus(menus)
+            return True
     return False
 
 
@@ -64,7 +60,6 @@ def main():
         for update in updates:
             update_id = update.get("update_id", 0)
             offset = update_id + 1
-            save_state({"offset": offset})
 
             message = update.get("message") or update.get("edited_message")
             if not message:
@@ -88,7 +83,8 @@ def main():
                 logger.error("Erreur traitement message: %s", e)
                 send_telegram(f"Erreur lors du traitement : {e}")
 
-        time.sleep(2)
+        if updates:
+            save_state({"offset": offset})
 
 
 def _handle_modification(user_text):
