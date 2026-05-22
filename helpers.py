@@ -22,7 +22,7 @@ STATE_PATH = BASE_DIR / "state.json"
 
 SEASON_MONTHS = {
     "printemps": [3, 4, 5],
-    "ete": [6, 7, 8],
+    "été": [6, 7, 8],
     "automne": [9, 10, 11],
     "hiver": [12, 1, 2],
 }
@@ -91,18 +91,54 @@ def save_state(data):
 
 
 def extract_json(text):
+    text = text.strip()
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
-    match = re.search(r"```(?:json)?\s*(\[.*?\]|\{.*?\})\s*```", text, re.DOTALL)
-    if match:
-        return json.loads(match.group(1))
-    for pattern in (r"(\[.*\])", r"(\{.*\})"):
-        match = re.search(pattern, text, re.DOTALL)
-        if match:
-            return json.loads(match.group(1))
+    fence = re.search(r"```(?:json)?\s*(.+?)\s*```", text, re.DOTALL)
+    if fence:
+        try:
+            return json.loads(fence.group(1).strip())
+        except json.JSONDecodeError:
+            pass
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(text):
+        if ch in "{[":
+            try:
+                obj, _ = decoder.raw_decode(text[i:])
+                return obj
+            except json.JSONDecodeError:
+                continue
     raise ValueError("Aucun JSON trouvé dans la réponse LLM")
+
+
+def normalize_recipe(recipe):
+    if not isinstance(recipe, dict):
+        raise ValueError(f"Recette invalide : {recipe!r}")
+    nom = recipe.get("nom") or recipe.get("name") or ""
+    raw = recipe.get("ingrédients") or recipe.get("ingredients") or []
+    ingredients = []
+    for item in raw:
+        if isinstance(item, dict):
+            ingredients.append({
+                "nom": item.get("nom") or item.get("name") or "",
+                "quantité": (
+                    item.get("quantité")
+                    or item.get("quantite")
+                    or item.get("quantity")
+                    or ""
+                ),
+            })
+        elif isinstance(item, str):
+            ingredients.append({"nom": item, "quantité": ""})
+    return {"nom": nom, "ingrédients": ingredients}
+
+
+def normalize_recipes(recipes):
+    if not isinstance(recipes, list):
+        raise ValueError(f"Liste de recettes attendue : {recipes!r}")
+    return [normalize_recipe(r) for r in recipes]
 
 
 class LockFile:

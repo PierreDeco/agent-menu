@@ -4,169 +4,65 @@
       "numéro": 2026,
       "Semaine": [
         {
-          "numéro": 1,
-          "menu": [
-            {
-              "nom": "nom du plat",
-              "ingrédients": [
-                {
-                  "nom": "ingrédient",
-                  "quantité": "quantité"
-                }
-              ]
-            }
-          ]
-        },
-        {
           "numéro": 21,
           "menu": [
             {
               "nom": "Pâtes aux courgettes, épinards et pignons de pin",
               "ingrédients": [
-                {
-                  "nom": "pâtes semi-complètes",
-                  "quantité": "300g"
-                },
-                {
-                  "nom": "courgettes",
-                  "quantité": "400g"
-                },
-                {
-                  "nom": "épinards frais",
-                  "quantité": "200g"
-                },
-                {
-                  "nom": "pignons de pin",
-                  "quantité": "80g"
-                },
-                {
-                  "nom": "oignon nouveau",
-                  "quantité": "1"
-                },
-                {
-                  "nom": "huile d'olive",
-                  "quantité": "3 cuillères à soupe"
-                },
-                {
-                  "nom": "ail",
-                  "quantité": "2 gousses"
-                },
-                {
-                  "nom": "citron",
-                  "quantité": "1"
-                },
-                {
-                  "nom": "sel, poivre",
-                  "quantité": "à goût"
-                },
-                {
-                  "nom": "herbes fraîches (thym, persil)",
-                  "quantité": "selon goût"
-                }
+                { "nom": "pâtes semi-complètes", "quantité": "300g" },
+                { "nom": "courgettes", "quantité": "400g" },
+                { "nom": "épinards frais", "quantité": "200g" },
+                { "nom": "pignons de pin", "quantité": "80g" },
+                { "nom": "oignon nouveau", "quantité": "1" },
+                { "nom": "huile d'olive", "quantité": "3 cuillères à soupe" },
+                { "nom": "ail", "quantité": "2 gousses" },
+                { "nom": "citron", "quantité": "1" },
+                { "nom": "sel, poivre", "quantité": "à goût" },
+                { "nom": "herbes fraîches (thym, persil)", "quantité": "selon goût" }
               ]
             },
             {
               "nom": "Salade tiède de betteraves et pois chiches rôtis",
               "ingrédients": [
-                {
-                  "nom": "betteraves",
-                  "quantité": "400g"
-                },
-                {
-                  "nom": "pois chiches cuits",
-                  "quantité": "250g"
-                },
-                {
-                  "nom": "roquette",
-                  "quantité": "150g"
-                },
-                {
-                  "nom": "carottes",
-                  "quantité": "2"
-                },
-                {
-                  "nom": "oignon nouveau",
-                  "quantité": "1"
-                },
-                {
-                  "nom": "huile d'olive",
-                  "quantité": "3 cuillères à soupe"
-                },
-                {
-                  "nom": "vinaigre balsamique",
-                  "quantité": "1 cuillère à soupe"
-                },
-                {
-                  "nom": "paprika",
-                  "quantité": "1 cuillère à café"
-                },
-                {
-                  "nom": "sel, poivre",
-                  "quantité": "à goût"
-                }
+                { "nom": "betteraves", "quantité": "400g" },
+                { "nom": "pois chiches cuits", "quantité": "250g" },
+                { "nom": "roquette", "quantité": "150g" },
+                { "nom": "carottes", "quantité": "2" },
+                { "nom": "oignon nouveau", "quantité": "1" },
+                { "nom": "huile d'olive", "quantité": "3 cuillères à soupe" },
+                { "nom": "vinaigre balsamique", "quantité": "1 cuillère à soupe" },
+                { "nom": "paprika", "quantité": "1 cuillère à café" },
+                { "nom": "sel, poivre", "quantité": "à goût" }
               ]
             },
             {
               "nom": "Omelette aux champignons et épinards",
-              "description": "Omelette généreuse avec champignons de Paris et épinards frais, accompagnée de pommes de terre",
-              "portions": "2-3 personnes",
-              "temps_actif_minutes": 20,
-              "temps_total_minutes": 25,
-              "ingredients": [
-                "6 œufs",
-                "250g de champignons de Paris",
-                "150g d'épinards frais",
-                "300g de pommes de terre",
-                "1 oignon nouveau",
-                "30g de beurre",
-                "Huile d'olive, sel, poivre, herbes fraîches"
-              ],
-              "instructions": [
-                "Cuire les pommes de terre à la vapeur ou à l'eau (15 minutes)",
-                "Nettoyer et émincer les champignons",
-                "Faire revenir les champignons et l'oignon nouveau à la poêle",
-                "Ajouter les épinards et laisser réduire",
-                "Battre les œufs avec sel et poivre",
-                "Verser dans une poêle beurrée et cuire l'omelette",
-                "Garnir avec le mélange champignons-épinards"
-              ],
-              "fibre": "épinards, champignons",
-              "feculent": "pommes de terre",
-              "proteine": "œufs",
-              "vegetarien": true,
-              "notes": "Plat simple et nourrissant, les restes se consomment froids"
+              "ingrédients": [
+                { "nom": "œufs", "quantité": "6" },
+                { "nom": "champignons de Paris", "quantité": "250g" },
+                { "nom": "épinards frais", "quantité": "150g" },
+                { "nom": "pommes de terre", "quantité": "300g" },
+                { "nom": "oignon nouveau", "quantité": "1" },
+                { "nom": "beurre", "quantité": "30g" },
+                { "nom": "huile d'olive", "quantité": "à goût" },
+                { "nom": "sel, poivre", "quantité": "à goût" },
+                { "nom": "herbes fraîches", "quantité": "selon goût" }
+              ]
             },
             {
               "nom": "Pâtes aux asperges, radis et œuf poché",
-              "description": "Pâtes fraîches avec asperges, radis croquants et œuf poché, finition citron",
-              "portions": "2-3 personnes",
-              "temps_actif_minutes": 25,
-              "temps_total_minutes": 25,
-              "ingredients": [
-                "300g de pâtes fraiches ou semi-complètes",
-                "250g d'asperges",
-                "100g de radis",
-                "2-3 œufs",
-                "100g de roquette",
-                "30g de parmesan",
-                "2 cuillères à soupe d'huile d'olive",
-                "1 citron",
-                "Sel, poivre, herbes fraîches"
-              ],
-              "instructions": [
-                "Cuire les pâtes selon les instructions",
-                "Cuire les asperges à la vapeur (8-10 minutes)",
-                "Découper les asperges en morceaux et les radis en fines tranches",
-                "Pocher les œufs dans l'eau frémissante (3-4 minutes)",
-                "Mélanger les pâtes cuites avec asperges, radis et roquette",
-                "Assaisonner avec huile d'olive, jus de citron, sel et poivre",
-                "Garnir avec œuf poché et parmesan râpé"
-              ],
-              "fibre": "asperges, radis, roquette",
-              "feculent": "pâtes",
-              "proteine": "œufs, parmesan",
-              "vegetarien": true,
-              "notes": "Plat frais et léger, parfait pour le printemps"
+              "ingrédients": [
+                { "nom": "pâtes fraîches ou semi-complètes", "quantité": "300g" },
+                { "nom": "asperges", "quantité": "250g" },
+                { "nom": "radis", "quantité": "100g" },
+                { "nom": "œufs", "quantité": "2-3" },
+                { "nom": "roquette", "quantité": "100g" },
+                { "nom": "parmesan", "quantité": "30g" },
+                { "nom": "huile d'olive", "quantité": "2 cuillères à soupe" },
+                { "nom": "citron", "quantité": "1" },
+                { "nom": "sel, poivre", "quantité": "à goût" },
+                { "nom": "herbes fraîches", "quantité": "selon goût" }
+              ]
             }
           ]
         }

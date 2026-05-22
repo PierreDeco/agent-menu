@@ -14,6 +14,7 @@ from helpers import (
     current_week,
     load_prompt,
     extract_json,
+    normalize_recipes,
 )
 
 
@@ -73,7 +74,10 @@ def main():
                 # f"Plats déjà utilisés (à ne pas répéter) : {used_str}."
             )
             recipes_json = call_llm(prompt1, msg1)
-            recipes = extract_json(recipes_json)
+            parsed = extract_json(recipes_json)
+            if isinstance(parsed, dict) and "menu" in parsed:
+                parsed = parsed["menu"]
+            recipes = normalize_recipes(parsed)
 
             prompt2 = load_prompt(2)
             formatted = call_llm(

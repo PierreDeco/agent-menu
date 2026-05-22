@@ -19,6 +19,7 @@ from helpers import (
     load_state,
     save_state,
     find_best_match,
+    normalize_recipe,
 )
 
 
@@ -140,12 +141,16 @@ def _handle_modification(user_text):
         + json.dumps(current_menu, ensure_ascii=False, indent=2)
     )
     new_recipe_raw = call_llm(prompt4, msg_replace)
-    new_recipe = extract_json(new_recipe_raw)
+    new_recipe = normalize_recipe(extract_json(new_recipe_raw))
 
-    replace_recipe_in_menu(menus, year, week, original_name, new_recipe)
+    if not replace_recipe_in_menu(menus, year, week, original_name, new_recipe):
+        send_telegram(
+            f"Impossible de remplacer la recette \"{original_name}\"."
+        )
+        return
     logger.info("Recette remplacée: %s", original_name)
 
-    updated_menu = get_current_week_menu(load_menus(), year, week)
+    updated_menu = get_current_week_menu(menus, year, week)
     prompt2 = load_prompt(2)
     recap = call_llm(
         prompt2, json.dumps(updated_menu, ensure_ascii=False, indent=2)
