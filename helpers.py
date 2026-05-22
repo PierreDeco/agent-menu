@@ -46,6 +46,7 @@ MONTHS_FR = [
 
 
 def setup_logging():
+    """Configure root logger: rotating file (1 MB × 3) + stdout."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -62,11 +63,13 @@ def setup_logging():
 
 
 def load_json(path):
+    """Load JSON from a path (UTF-8)."""
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def save_json(path, data):
+    """Atomically write JSON to a path via a .tmp + rename."""
     tmp = path.with_suffix(".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
@@ -86,6 +89,7 @@ def save_menus(data):
 
 
 def load_state():
+    """Load state.json, returning {} if missing or corrupted."""
     try:
         return load_json(STATE_PATH)
     except (FileNotFoundError, json.JSONDecodeError):
@@ -97,6 +101,12 @@ def save_state(data):
 
 
 def extract_json(text):
+    """Extract a JSON object/array from LLM output.
+
+    Tries direct parse, then markdown fences (```json ... ```), then
+    scans for the first { or [ and uses raw_decode to handle JSON
+    embedded in surrounding prose. Raises ValueError if none found.
+    """
     text = text.strip()
     try:
         return json.loads(text)
@@ -120,6 +130,12 @@ def extract_json(text):
 
 
 def normalize_recipe(recipe):
+    """Coerce a recipe dict to the canonical {nom, ingrédients[]} shape.
+
+    Tolerates LLM drift: accepts "ingredients" without the accent,
+    string-form ingredient items ("6 œufs"), and drops any extra
+    fields the LLM may have invented (description, instructions, …).
+    """
     if not isinstance(recipe, dict):
         raise ValueError(f"Recette invalide : {recipe!r}")
     nom = recipe.get("nom") or recipe.get("name") or ""
@@ -142,12 +158,20 @@ def normalize_recipe(recipe):
 
 
 def normalize_recipes(recipes):
+    """Apply normalize_recipe to a list of recipes."""
     if not isinstance(recipes, list):
         raise ValueError(f"Liste de recettes attendue : {recipes!r}")
     return [normalize_recipe(r) for r in recipes]
 
 
 class LockFile:
+    """POSIX advisory file lock (fcntl.flock) used as a context manager.
+
+    Coordinates writes between menu_generator and menu_modifier on the
+    shared menus.json. Use blocking=False to fail fast with
+    BlockingIOError when another process holds the lock.
+    """
+
     def __init__(self, path=None, blocking=True):
         self.path = Path(path or LOCK_PATH)
         self.blocking = blocking
@@ -189,6 +213,10 @@ def _anthropic_client():
 
 
 def call_llm(system_prompt, user_message, max_retries=3):
+    """Call Claude with the given prompts; retry up to max_retries with
+    exponential backoff (1s, 2s, 4s). Returns the text of the first
+    content block. Raises after the final failed attempt.
+    """
     client = _anthropic_client()
     for attempt in range(max_retries):
         try:
@@ -214,6 +242,11 @@ def call_llm(system_prompt, user_message, max_retries=3):
 
 
 def send_telegram(message):
+    """Send a Markdown-formatted message to the configured chat.
+
+    If TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing, the message
+    is logged instead of sent — useful for local testing.
+    """
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
@@ -234,6 +267,11 @@ def send_telegram(message):
 
 
 def get_updates(offset=0, timeout=30):
+    """Long-poll Telegram for new messages, starting at offset.
+
+    Returns an empty list on timeout or any error so the caller can
+    safely loop. Blocks up to `timeout` seconds server-side.
+    """
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
         logging.warning("TELEGRAM_BOT_TOKEN non défini — pas de polling")
@@ -254,6 +292,7 @@ def get_updates(offset=0, timeout=30):
 
 
 def current_week():
+    """Return ISO year/week info for today plus French month name and season."""
     today = date.today()
     year, week, _ = today.isocalendar()
     month = today.month
@@ -268,6 +307,11 @@ def current_week():
 
 
 def find_best_match(query, candidates, threshold=70):
+    """Fuzzy-match query against candidates (thefuzz, score_cutoff=70).
+
+    Returns the best matching candidate string or None if no candidate
+    scores above the threshold.
+    """
     result = process.extractOne(query, candidates, score_cutoff=threshold)
     return result[0] if result else None
 
@@ -276,6 +320,11 @@ _PROMPTS = None
 
 
 def load_prompt(num):
+    """Return the body of prompt #num from prompts.md.
+
+    On first call, parses the file once and caches all prompts in
+    memory; subsequent calls are dict lookups.
+    """
     global _PROMPTS
     if _PROMPTS is None:
         path = BASE_DIR / "prompts.md"
@@ -294,6 +343,7 @@ def load_prompt(num):
 
 
 def find_week_entry(menus, year, week):
+    """Return the week dict for (year, week) in the menus structure, or None."""
     for year_entry in menus.get("Année", []):
         if year_entry.get("numéro") == year:
             for week_entry in year_entry.get("Semaine", []):

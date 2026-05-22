@@ -25,11 +25,17 @@ from helpers import (
 
 
 def get_current_week_menu(menus, year, week):
+    """Return the list of recipes for (year, week), or None if absent."""
     entry = find_week_entry(menus, year, week)
     return entry.get("menu", []) if entry else None
 
 
 def replace_recipe_in_menu(menus, year, week, original_name, new_recipe):
+    """Replace original_name with new_recipe in (year, week) and persist.
+
+    Returns True on success, False if the week or recipe was not found.
+    Mutates `menus` in place.
+    """
     entry = find_week_entry(menus, year, week)
     if entry is None:
         return False
@@ -43,6 +49,13 @@ def replace_recipe_in_menu(menus, year, week, original_name, new_recipe):
 
 
 def main():
+    """Long-poll Telegram and apply recipe modification requests.
+
+    Persists the Telegram update offset in state.json so messages
+    aren't re-processed after a restart. Takes a non-blocking lock on
+    menus.json — if the generator is running, the user is asked to
+    retry later.
+    """
     setup_logging()
     logger = logging.getLogger("menu_modifier")
     logger.info("Démon de modification démarré")
@@ -88,6 +101,12 @@ def main():
 
 
 def _handle_modification(user_text):
+    """Run the full modification flow for one user message.
+
+    Pipeline: intent detection (prompt 3) → fuzzy-match the target
+    recipe → ask Claude for a replacement (prompt 4) → write to disk →
+    send an updated recap (prompt 2).
+    """
     logger = logging.getLogger("menu_modifier")
 
     week_info = current_week()

@@ -19,6 +19,11 @@ from helpers import (
 
 
 def save_week(menus, year, week, recipes):
+    """Upsert the given week's recipes into menus, then persist to disk.
+
+    Creates the year entry if missing and replaces any existing week
+    with the same number.
+    """
     year_entry = None
     for entry in menus.get("Année", []):
         if entry.get("numéro") == year:
@@ -40,6 +45,12 @@ def save_week(menus, year, week, recipes):
 
 
 def main():
+    """Generate this week's menu and send it on Telegram.
+
+    Holds the menus.json lock (blocking) for the duration of the run.
+    On failure, logs and sends a Telegram error message before exiting
+    with code 1.
+    """
     setup_logging()
     logger = logging.getLogger("menu_generator")
 
