@@ -22,6 +22,7 @@ from helpers import (
     find_week_entry,
     normalize_recipe,
 )
+from menu_generator import generate_menu
 
 
 def get_current_week_menu(menus, year, week):
@@ -84,17 +85,30 @@ def main():
 
             logger.info("Message reçu: %s", text[:100])
 
-            try:
-                with LockFile(blocking=False):
-                    _handle_modification(text)
-            except BlockingIOError:
-                send_telegram(
-                    "Le menu est en cours de génération. "
-                    "Réessaie dans quelques minutes."
-                )
-            except Exception as e:
-                logger.error("Erreur traitement message: %s", e)
-                send_telegram(f"Erreur lors du traitement : {e}")
+            if text.startswith("/recettes"):
+                logger.info("Commande /recettes reçue")
+                try:
+                    with LockFile(blocking=False):
+                        generate_menu()
+                except BlockingIOError:
+                    send_telegram(
+                        "Génération déjà en cours, réessaie dans quelques minutes."
+                    )
+                except Exception as e:
+                    logger.error("Erreur génération menu: %s", e)
+                    send_telegram(f"Erreur lors de la génération : {e}")
+            else:
+                try:
+                    with LockFile(blocking=False):
+                        _handle_modification(text)
+                except BlockingIOError:
+                    send_telegram(
+                        "Le menu est en cours de génération. "
+                        "Réessaie dans quelques minutes."
+                    )
+                except Exception as e:
+                    logger.error("Erreur traitement message: %s", e)
+                    send_telegram(f"Erreur lors du traitement : {e}")
 
         if updates:
             save_state({"offset": offset})

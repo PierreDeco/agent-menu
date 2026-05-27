@@ -44,6 +44,46 @@ def save_week(menus, year, week, recipes):
     save_menus(menus)
 
 
+def generate_menu():
+    """Generate this week's menu and send it on Telegram.
+
+    Assumes the menus.json lock is already held by the caller.
+    Raises on failure (does not sys.exit).
+    """
+    logger = logging.getLogger("menu_generator")
+
+    week_info = current_week()
+    year = week_info["year"]
+    week = week_info["week"]
+    season = week_info["season"]
+    month_name = week_info["month_name"]
+
+    menus = load_menus()
+    seasons = load_seasons()
+    ingredients = ", ".join(seasons.get(season, []))
+
+    prompt1 = load_prompt(1)
+    msg1 = (
+        f"Génère un menu de 4 recettes pour la semaine {week} ({month_name} {year}).\n"
+        f"Saison : {season}. Ingrédients de saison : {ingredients}."
+    )
+    recipes_json = call_llm(prompt1, msg1)
+    parsed = extract_json(recipes_json)
+    if isinstance(parsed, dict) and "menu" in parsed:
+        parsed = parsed["menu"]
+    recipes = normalize_recipes(parsed)
+
+    prompt2 = load_prompt(2)
+    formatted = call_llm(
+        prompt2, json.dumps(recipes, ensure_ascii=False, indent=2)
+    )
+
+    send_telegram(formatted)
+    save_week(menus, year, week, recipes)
+
+    logger.info("Menu semaine %d/%d généré avec succès", week, year)
+
+
 def main():
     """Generate this week's menu and send it on Telegram.
 
@@ -54,40 +94,11 @@ def main():
     setup_logging()
     logger = logging.getLogger("menu_generator")
 
-    week_info = current_week()
-    year = week_info["year"]
-    week = week_info["week"]
-    season = week_info["season"]
-    month_name = week_info["month_name"]
-
     with LockFile(blocking=True):
         try:
-            menus = load_menus()
-            seasons = load_seasons()
-            ingredients = ", ".join(seasons.get(season, []))
-
-            prompt1 = load_prompt(1)
-            msg1 = (
-                f"Génère un menu de 4 recettes pour la semaine {week} ({month_name} {year}).\n"
-                f"Saison : {season}. Ingrédients de saison : {ingredients}."
-            )
-            recipes_json = call_llm(prompt1, msg1)
-            parsed = extract_json(recipes_json)
-            if isinstance(parsed, dict) and "menu" in parsed:
-                parsed = parsed["menu"]
-            recipes = normalize_recipes(parsed)
-
-            prompt2 = load_prompt(2)
-            formatted = call_llm(
-                prompt2, json.dumps(recipes, ensure_ascii=False, indent=2)
-            )
-
-            send_telegram(formatted)
-            save_week(menus, year, week, recipes)
-
-            logger.info("Menu semaine %d/%d généré avec succès", week, year)
-
+            generate_menu()
         except Exception as e:
+            week = current_week()["week"]
             logger.error("Erreur génération menu: %s", e)
             send_telegram(f"Erreur génération menu semaine {week} : {e}")
             sys.exit(1)
