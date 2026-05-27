@@ -208,7 +208,10 @@ def _anthropic_client():
         key = os.getenv("ANTHROPIC_API_KEY")
         if not key:
             raise RuntimeError("ANTHROPIC_API_KEY non définie")
-        _client = anthropic.Anthropic(api_key=key)
+        url = os.getenv("ANTHROPIC_BASE_URL")
+        if not url:
+            _client = anthropic.Anthropic(api_key=key)
+        _client = anthropic.Anthropic(base_url=url, api_key=key)
     return _client
 
 
@@ -218,6 +221,7 @@ def call_llm(system_prompt, user_message, max_retries=3):
     content block. Raises after the final failed attempt.
     """
     client = _anthropic_client()
+    logging.info(f"User message passé au LLM : {user_message}")
     for attempt in range(max_retries):
         try:
             response = client.messages.create(
