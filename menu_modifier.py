@@ -50,7 +50,9 @@ def replace_recipe_in_menu(menus, year, week, original_name, new_recipe):
 
 
 def main():
-    """Long-poll Telegram and apply recipe modification requests.
+    """Long-poll Telegram.
+    Also generates menus on the "/recettes" command call or modifies
+    menu on user's demand.
 
     Persists the Telegram update offset in state.json so messages
     aren't re-processed after a restart. Takes a non-blocking lock on
@@ -58,8 +60,8 @@ def main():
     retry later.
     """
     setup_logging()
-    logger = logging.getLogger("menu_modifier")
-    logger.info("Démon de modification démarré")
+    logger = logging.getLogger("Daemon")
+    logger.info("Agent démarré")
 
     offset = load_state().get("offset", 0)
 
