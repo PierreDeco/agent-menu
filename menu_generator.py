@@ -82,27 +82,3 @@ def generate_menu():
     save_week(menus, year, week, recipes)
 
     logger.info("Menu semaine %d/%d généré avec succès", week, year)
-
-
-def main():
-    """Generate this week's menu and send it on Telegram.
-
-    Holds the menus.json lock (blocking) for the duration of the run.
-    On failure, logs and sends a Telegram error message before exiting
-    with code 1.
-    """
-    setup_logging()
-    logger = logging.getLogger("menu_generator")
-
-    with LockFile(blocking=True):
-        try:
-            generate_menu()
-        except Exception as e:
-            week = current_week()["week"]
-            logger.error("Erreur génération menu: %s", e)
-            send_telegram(f"Erreur génération menu semaine {week} : {e}")
-            sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
