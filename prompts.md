@@ -11,7 +11,10 @@ peux proposer un plat non végétarien (typiquement une fois par semaine, grand
 maximum deux fois). Ces plats doivent pouvoir être cuisinés en 30min d'activité
 max (le temps de cuisson peut faire dépasser les 30min, ce n'est pas un temps
 actif). Tu recevras en entrée : le numéro de semaine cible, l'année, la saison
-et la liste des ingrédients de saison actuels. L'output attendu est le bloc
+et la liste des ingrédients de saison actuels. Le message peut également
+contenir une ligne « Recettes des semaines récentes à éviter : … » listant
+les plats déjà proposés ces dernières semaines — tu ne dois pas les
+reproposer. L'output attendu est le bloc
 semaine pour la semaine suivante. Le bloc doit respecter le format du json
 suivant :
 
@@ -69,6 +72,10 @@ par une autre dans une menu hebdomadaire. Tu recevras en entrée :
 * la raison invoquée par l'utilisateur.
 * la saison actuelle, ainsi que les fruits et légumes de saison.
 * le menu complet actuel.
+* éventuellement, une liste « Recettes des semaines récentes à éviter : … »
+  listant les plats déjà proposés ces dernières semaines, que tu ne dois
+  pas reproposer.
+
 Prévois des portions pour 2-3 personnes afin de pouvoir reconsommer le plat
 plusieurs fois dans la semaine. Les plats doivent être de saison, équilibrés
 (ils doivent notamment comporter systématiquement une fibre, un féculent, une

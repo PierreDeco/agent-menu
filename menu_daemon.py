@@ -21,6 +21,7 @@ from helpers import (
     find_best_match,
     find_week_entry,
     normalize_recipe,
+    get_recent_recipe_names,
 )
 from menu_generator import generate_menu
 
@@ -168,8 +169,14 @@ def _handle_modification(user_text):
         f'Recette à remplacer : "{original_name}".\n'
         f"Raison : {raison}.\n"
         f"Saison : {season}. Ingrédients de saison : {ingredients}.\n"
-        f"Menu complet actuel :\n"
-        + json.dumps(current_menu, ensure_ascii=False, indent=2)
+    )
+    recent = get_recent_recipe_names(menus)
+    if recent:
+        msg_replace += (
+            f"Recettes des semaines récentes à éviter : {', '.join(recent)}.\n"
+        )
+    msg_replace += "Menu complet actuel :\n" + json.dumps(
+        current_menu, ensure_ascii=False, indent=2
     )
     new_recipe_raw = call_llm(prompt4, msg_replace)
     new_recipe = normalize_recipe(extract_json(new_recipe_raw))

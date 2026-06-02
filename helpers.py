@@ -346,6 +346,28 @@ def load_prompt(num):
     return _PROMPTS[num]
 
 
+def get_recent_recipe_names(menus, n=8):
+    """Return a flat list of recipe names from the n most recent weeks.
+
+    Sorts all weeks across all years by (year, week) descending and
+    returns the recipe names of the top n weeks. Returns [] if menus
+    is empty.
+    """
+    weeks = []
+    for year_entry in menus.get("Année", []):
+        year = year_entry.get("numéro")
+        for week_entry in year_entry.get("Semaine", []):
+            weeks.append((year, week_entry.get("numéro"), week_entry))
+    weeks.sort(key=lambda t: (t[0], t[1]), reverse=True)
+    names = []
+    for _, _, week_entry in weeks[:n]:
+        for recipe in week_entry.get("menu", []):
+            nom = recipe.get("nom")
+            if nom:
+                names.append(nom)
+    return names
+
+
 def find_week_entry(menus, year, week):
     """Return the week dict for (year, week) in the menus structure, or None."""
     for year_entry in menus.get("Année", []):

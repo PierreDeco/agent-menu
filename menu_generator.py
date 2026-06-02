@@ -15,6 +15,7 @@ from helpers import (
     load_prompt,
     extract_json,
     normalize_recipes,
+    get_recent_recipe_names,
 )
 
 
@@ -67,6 +68,9 @@ def generate_menu():
         f"Génère un menu de 4 recettes pour la semaine {week} ({month_name} {year}).\n"
         f"Saison : {season}. Ingrédients de saison : {ingredients}."
     )
+    recent = get_recent_recipe_names(menus)
+    if recent:
+        msg1 += f"\nRecettes des semaines récentes à éviter : {', '.join(recent)}."
     recipes_json = call_llm(prompt1, msg1)
     parsed = extract_json(recipes_json)
     if isinstance(parsed, dict) and "menu" in parsed:
