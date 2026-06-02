@@ -1,6 +1,7 @@
 .env
 menu.lock
 state.json
+menus.json
 logs.txt
 *.tmp
 __pycache__/
