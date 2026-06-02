@@ -12,8 +12,14 @@ See [README.md](README.md) for setup and usage, [ARCHITECTURE.md](ARCHITECTURE.m
 
 ```bash
 pip install -r requirements.txt   # install deps
-python menu_generator.py          # one-shot weekly generation
-python menu_modifier.py           # long-running Telegram listener
+python menu_daemon.py             # long-running Telegram listener (handles /recettes and modifications)
+```
+
+`menu_generator.py` exposes `generate_menu()` as a library function — it has no `__main__` block. The daemon invokes it when the user sends `/recettes` on Telegram. To trigger generation from the shell (e.g. cron), wrap the call:
+
+```bash
+python -c "from helpers import setup_logging, LockFile; from menu_generator import generate_menu; setup_logging()
+with LockFile(): generate_menu()"
 ```
 
 No build, no linter, no test suite. To smoke-test code paths without sending real Telegram messages, unset `TELEGRAM_BOT_TOKEN` or `TELEGRAM_CHAT_ID` — messages are logged instead of sent.
@@ -26,9 +32,10 @@ No build, no linter, no test suite. To smoke-test code paths without sending rea
 
 ## Things to know when editing
 
-- Two processes share `menus.json` via an `fcntl` advisory lock (`menu.lock`). The generator takes a blocking lock, the modifier a non-blocking one. Any new code that writes to `menus.json` must hold the lock.
+- `menu_daemon.py` orchestrates both flows (generation on `/recettes`, recipe replacement on any other message). It always holds the lock on `menus.json` before calling into `menu_generator` or `_handle_modification`. Any new code that writes to `menus.json` must hold the lock via `LockFile`.
 - LLM output drifts from the documented schema. Always pipe `extract_json` output through `normalize_recipe` / `normalize_recipes` before writing to disk or comparing names. The canonical recipe shape is `{nom, ingrédients: [{nom, quantité}]}` — anything else gets coerced or dropped.
 - Prompts live in `prompts.md` and are addressed by header (`## Prompt N`). Adding a new prompt: append a `## Prompt N` section, access it via `helpers.load_prompt(N)`. Parsing is cached at first call.
+- Prompts 1 and 4 receive an optional `"Recettes des semaines récentes à éviter : …"` line, built by `helpers.get_recent_recipe_names(menus, n=8)` from `menus.json`. The history is the 8 most recent weeks across all years (sorted by `(year, week)` descending), names only. The line is omitted entirely when no history exists.
 - The Anthropic client is a lazy module-level singleton in `helpers.py`. Use `call_llm(...)` rather than instantiating `anthropic.Anthropic(...)` elsewhere — that would bypass the cache and the env-var validation.
 - `current_week()` returns season keys that must match `seasons.json` exactly (`"été"` with accent, not `"ete"`). Adding a new season requires updating both `SEASON_MONTHS` in `helpers.py` and `seasons.json`.
-- The modifier persists the Telegram update offset in `state.json` (written once per polled batch). When debugging stuck states, deleting `state.json` resets polling to "from latest".
+- The daemon persists the Telegram update offset in `state.json` (written once per polled batch). When debugging stuck states, deleting `state.json` resets polling to "from latest".

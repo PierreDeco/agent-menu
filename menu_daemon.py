@@ -124,7 +124,7 @@ def _handle_modification(user_text):
     recipe → ask Claude for a replacement (prompt 4) → write to disk →
     send an updated recap (prompt 2).
     """
-    logger = logging.getLogger("menu_modifier")
+    logger = logging.getLogger("menu_daemon")
 
     week_info = current_week()
     year = week_info["year"]

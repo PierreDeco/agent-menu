@@ -4,12 +4,14 @@ Agent de planification de repas hebdomadaire propulsé par Claude et piloté par
 
 ## Fonctionnement
 
-Le projet expose deux exécutables indépendants :
+Le projet repose sur un démon unique, **`menu_daemon.py`**, qui écoute Telegram en long-polling et orchestre les deux flux :
 
-- **`menu_generator.py`** — exécution ponctuelle (typiquement via cron) qui génère le menu de la semaine courante et l'envoie sur Telegram.
-- **`menu_modifier.py`** — démon long-running qui écoute Telegram via long-polling et orchestre les remplacements de recettes demandés par l'utilisateur.
+- **Génération** — sur la commande `/recettes`, le démon appelle `menu_generator.generate_menu()` pour produire le menu de la semaine courante et l'envoyer sur Telegram.
+- **Modification** — sur n'importe quel autre message, le démon détecte l'intention via Claude et remplace une recette du menu courant.
 
-Les deux processus partagent l'état via les fichiers JSON et coordonnent leurs écritures via un fichier de lock (`menu.lock`).
+Lors de la génération comme du remplacement, Claude reçoit également la liste des recettes des 8 dernières semaines (extraite de `menus.json`) pour éviter de reproposer les mêmes plats.
+
+`menu_generator.py` n'a pas de point d'entrée CLI : `generate_menu()` est une fonction bibliothèque appelée par le démon (qui détient déjà le lock sur `menus.json`).
 
 Pour les choix de conception, voir [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -44,31 +46,29 @@ Si `TELEGRAM_BOT_TOKEN` ou `TELEGRAM_CHAT_ID` est absent, les messages sont uniq
 
 ## Utilisation
 
-### Génération manuelle d'un menu
+### Lancement du démon
 
 ```bash
-python menu_generator.py
-```
-
-Le menu de la semaine ISO courante est généré, sauvegardé dans `menus.json` et envoyé sur Telegram.
-
-### Génération automatique (cron)
-
-Pour générer le menu chaque lundi matin à 8h :
-
-```cron
-0 8 * * 1 cd /chemin/vers/agent-menu && /usr/bin/python3 menu_generator.py
-```
-
-### Démon de modification
-
-Lance le démon pour écouter les demandes de modification :
-
-```bash
-python menu_modifier.py
+python menu_daemon.py
 ```
 
 Le démon tourne en continu et peut être supervisé par `systemd`, `supervisord` ou `tmux`.
+
+### Génération manuelle d'un menu
+
+Envoie `/recettes` au bot Telegram : le démon génère le menu de la semaine ISO courante, le sauvegarde dans `menus.json` et le renvoie sur Telegram.
+
+### Génération automatique (cron)
+
+`menu_generator.py` n'étant pas exécutable directement, deux options :
+
+- **Recommandée** : programmer l'envoi d'un message `/recettes` chaque semaine via un client Telegram automatisé.
+- **Alternative** : invoquer la fonction depuis cron en wrappant la prise de lock. Attention : à ne lancer que si le démon est arrêté, sinon le lock bloquera.
+
+```cron
+0 8 * * 1 cd /chemin/vers/agent-menu && /usr/bin/python3 -c "from helpers import setup_logging, LockFile; from menu_generator import generate_menu; setup_logging()
+with LockFile(): generate_menu()"
+```
 
 ### Exemples de messages Telegram
 
@@ -84,14 +84,14 @@ Le bot identifie la recette concernée (matching flou), demande à Claude de pro
 
 ```
 agent-menu/
-├── menu_generator.py   # entrypoint génération hebdo
-├── menu_modifier.py    # démon de modification
+├── menu_daemon.py      # démon Telegram (orchestration génération + modification)
+├── menu_generator.py   # fonction generate_menu() appelée par le démon
 ├── helpers.py          # I/O, LLM, Telegram, lock, parsing
 ├── prompts.md          # les 4 prompts envoyés à Claude
 ├── seasons.json        # ingrédients de saison par saison
 ├── menus.json          # historique des menus générés
 ├── state.json          # offset Telegram (persistance polling)
-├── menu.lock           # lock inter-processus
+├── menu.lock           # lock pour les écritures sur menus.json
 └── logs.txt            # logs (rotation 1 MB × 3)
 ```
 

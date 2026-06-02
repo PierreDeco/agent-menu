@@ -5,37 +5,38 @@ Ce document décrit les choix de conception d'`agent-menu`. Pour l'installation 
 ## Vue d'ensemble
 
 ```
-                   ┌──────────────────────┐
-   cron weekly ──▶ │  menu_generator.py   │ ─┐
-                   └──────────────────────┘  │
-                                             │      ┌────────────┐
-                            menu.lock        ├─▶ ─▶ │ menus.json │
-                                             │      └────────────┘
-                   ┌──────────────────────┐  │
-   Telegram   ──▶  │  menu_modifier.py    │ ─┘
-   polling         └──────────────────────┘
+                                  ┌────────────────────┐
+   Telegram /recettes  ─────────▶ │                    │ ──▶ generate_menu()  ─┐
+                                  │   menu_daemon.py   │                       │
+   Telegram message libre ─────▶  │ (long-polling)     │ ──▶ _handle_modif()  ─┤
+                                  └────────────────────┘                       │
+                                                                  menu.lock    │
+                                                                               ▼
+                                                                       ┌────────────┐
+                                                                       │ menus.json │
+                                                                       └────────────┘
 ```
 
-Deux processus indépendants partagent les mêmes fichiers JSON :
+Un seul démon (`menu_daemon.py`) écoute Telegram et délègue à deux fonctions selon le message :
 
-- Le **generator** est court — il s'exécute une fois par semaine, écrit le menu, envoie le message Telegram et termine.
-- Le **modifier** est long — il long-polle Telegram en continu, applique des remplacements à la demande.
+- `menu_generator.generate_menu()` — génère le menu de la semaine courante.
+- `_handle_modification()` (interne au démon) — applique un remplacement de recette.
 
-Un fichier de lock (`menu.lock`) coordonne les écritures concurrentes sur `menus.json`.
+Le démon prend systématiquement un lock non-bloquant sur `menus.json` avant d'invoquer l'un ou l'autre. Le lock reste utile pour qu'un job cron lançant `generate_menu` en parallèle ne corrompe pas le fichier.
 
 ## Choix de conception
 
-### Pourquoi deux processus séparés
+### Pourquoi un démon plutôt qu'un script lancé par cron
 
-L'alternative serait un seul démon qui gère à la fois la planification hebdo (avec un scheduler interne) et le polling Telegram. Le découpage choisi est plus simple :
+L'alternative serait deux exécutables séparés : un `menu_generator.py` lancé par cron chaque semaine, et un `menu_daemon.py` séparé pour les modifications. Le découpage actuel privilégie un seul process :
 
-- Le generator est trivialement testable manuellement (`python menu_generator.py`).
-- Le scheduling est délégué à `cron`/`systemd`, qui est plus fiable qu'un sleep interne.
-- Le modifier peut crasher et être redémarré sans impact sur la génération hebdo.
+- Un seul point d'entrée (`/recettes` sur Telegram) pour déclencher une génération à la demande, sans avoir à se connecter au serveur.
+- Pas de second process à superviser.
+- La séparation reste possible en récupérant l'ancien `__main__` de `menu_generator` si on veut un cron strict.
 
 ### Locking inter-processus
 
-`helpers.LockFile` utilise `fcntl.flock` (POSIX advisory lock) sur `menu.lock`. Le generator prend un lock bloquant (il doit terminer son écriture), tandis que le modifier prend un lock non-bloquant : si le generator tient le lock, le modifier renvoie un message à l'utilisateur lui demandant de réessayer.
+`helpers.LockFile` utilise `fcntl.flock` (POSIX advisory lock) sur `menu.lock`. Le démon prend un lock non-bloquant avant chaque génération ou modification : si un autre process (un cron de génération par exemple) tient déjà le lock, l'utilisateur reçoit un message lui demandant de réessayer. Un appel direct à `generate_menu()` depuis cron utilisera plutôt un lock bloquant (cf. `README.md`).
 
 ### Format JSON et schéma des recettes
 
@@ -62,6 +63,10 @@ Les clés JSON utilisent le vocabulaire métier en français (`"Année"`, `"Sema
 
 Le cas (3) utilise `json.JSONDecoder.raw_decode` qui consomme un objet JSON valide depuis n'importe quelle position et ignore le suffixe — robuste aux objets imbriqués (qu'un simple regex non-greedy tronquerait au premier `}`).
 
+### Historique injecté dans les prompts
+
+Pour éviter que Claude reproduise les mêmes plats d'une semaine à l'autre, les prompts 1 (génération) et 4 (remplacement) reçoivent en entrée la liste des recettes des 8 dernières semaines, extraite de `menus.json` par `helpers.get_recent_recipe_names`. Seuls les noms sont transmis (coût token minimal). La ligne est omise quand l'historique est vide (premier lancement). Le tri se fait sur `(année, semaine)` décroissant, à travers toutes les années.
+
 ### Fuzzy matching des noms de recettes
 
 Quand l'utilisateur écrit "remplace les pâtes aux courgettes", le LLM (prompt 3) extrait le nom de recette mentionné, mais celui-ci ne matche pas forcément exactement l'entrée stockée. `helpers.find_best_match` (via `thefuzz`) fait un matching avec un seuil de 70 pour résoudre la recette ciblée parmi le menu courant.
@@ -79,7 +84,7 @@ Logs en fichier (`logs.txt`) avec `RotatingFileHandler` pour borner l'espace dis
 
 ### Polling Telegram
 
-Le modifier utilise long-polling (`timeout=30` côté Telegram, +5s côté `requests`) plutôt que des webhooks pour éviter d'avoir à exposer un port. L'offset des messages traités est persisté dans `state.json` pour ne pas re-traiter les messages au redémarrage. La sauvegarde se fait une fois par batch reçu, pas par message individuel, pour limiter les fsync.
+Le démon utilise long-polling (`timeout=30` côté Telegram, +5s côté `requests`) plutôt que des webhooks pour éviter d'avoir à exposer un port. L'offset des messages traités est persisté dans `state.json` pour ne pas re-traiter les messages au redémarrage. La sauvegarde se fait une fois par batch reçu, pas par message individuel, pour limiter les fsync.
 
 ### Retry LLM
 

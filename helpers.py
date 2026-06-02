@@ -77,14 +77,17 @@ def save_json(path, data):
 
 
 def load_seasons():
+    """Load seasons.json (season → seasonal ingredients mapping)."""
     return load_json(SEASONS_PATH)
 
 
 def load_menus():
+    """Load menus.json (full week-by-week recipe history)."""
     return load_json(MENUS_PATH)
 
 
 def save_menus(data):
+    """Atomically persist the menus structure back to menus.json."""
     save_json(MENUS_PATH, data)
 
 
@@ -97,6 +100,7 @@ def load_state():
 
 
 def save_state(data):
+    """Atomically persist the state dict (e.g. Telegram offset) to state.json."""
     save_json(STATE_PATH, data)
 
 
@@ -167,8 +171,8 @@ def normalize_recipes(recipes):
 class LockFile:
     """POSIX advisory file lock (fcntl.flock) used as a context manager.
 
-    Coordinates writes between menu_generator and menu_modifier on the
-    shared menus.json. Use blocking=False to fail fast with
+    Coordinates writes on the shared menus.json between the daemon and
+    any external job (e.g. cron) invoking generate_menu directly. Use blocking=False to fail fast with
     BlockingIOError when another process holds the lock.
     """
 
