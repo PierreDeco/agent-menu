@@ -1,8 +1,8 @@
 # Architecture
 
-Ce document décrit les choix de conception d'`agent-menu`. Pour l'installation et l'usage, voir [README.md](README.md).
+This document describes the design decisions of `agent-menu`. For installation and usage, see [README.md](README.md).
 
-## Vue d'ensemble
+## Overview
 
 ```
                                   ┌────────────────────┐
@@ -17,30 +17,30 @@ Ce document décrit les choix de conception d'`agent-menu`. Pour l'installation 
                                                                        └────────────┘
 ```
 
-Un seul démon (`menu_daemon.py`) écoute Telegram et délègue à deux fonctions selon le message :
+A single daemon (`menu_daemon.py`) listens to Telegram and delegates to two functions based on the message:
 
-- `menu_generator.generate_menu()` — génère le menu de la semaine courante.
-- `_handle_modification()` (interne au démon) — applique un remplacement de recette.
+- `menu_generator.generate_menu()` — generates the current week's menu.
+- `_handle_modification()` (internal to the daemon) — applies a recipe replacement.
 
-Le démon prend systématiquement un lock non-bloquant sur `menus.json` avant d'invoquer l'un ou l'autre. Le lock reste utile pour qu'un job cron lançant `generate_menu` en parallèle ne corrompe pas le fichier.
+The daemon always acquires a non-blocking lock on `menus.json` before invoking either. The lock ensures a cron job running `generate_menu` in parallel does not corrupt the file.
 
-## Choix de conception
+## Design decisions
 
-### Pourquoi un démon plutôt qu'un script lancé par cron
+### Why a daemon rather than a cron script
 
-L'alternative serait deux exécutables séparés : un `menu_generator.py` lancé par cron chaque semaine, et un `menu_daemon.py` séparé pour les modifications. Le découpage actuel privilégie un seul process :
+The alternative would be two separate executables: `menu_generator.py` run by cron each week, and a separate `menu_daemon.py` for modifications. The current design favours a single process:
 
-- Un seul point d'entrée (`/recettes` sur Telegram) pour déclencher une génération à la demande, sans avoir à se connecter au serveur.
-- Pas de second process à superviser.
-- La séparation reste possible en récupérant l'ancien `__main__` de `menu_generator` si on veut un cron strict.
+- A single entry point (`/recettes` on Telegram) to trigger generation on demand, without connecting to the server.
+- No second process to supervise.
+- The split remains possible by recovering the old `__main__` from `menu_generator` if a strict cron is needed.
 
-### Locking inter-processus
+### Inter-process locking
 
-`helpers.LockFile` utilise `fcntl.flock` (POSIX advisory lock) sur `menu.lock`. Le démon prend un lock non-bloquant avant chaque génération ou modification : si un autre process (un cron de génération par exemple) tient déjà le lock, l'utilisateur reçoit un message lui demandant de réessayer. Un appel direct à `generate_menu()` depuis cron utilisera plutôt un lock bloquant (cf. `README.md`).
+`helpers.LockFile` uses `fcntl.flock` (POSIX advisory lock) on `menu.lock`. The daemon acquires a non-blocking lock before each generation or modification: if another process (e.g. a generation cron job) already holds the lock, the user receives a message asking them to retry. A direct call to `generate_menu()` from cron will use a blocking lock instead (see `README.md`).
 
-### Format JSON et schéma des recettes
+### JSON format and recipe schema
 
-Les recettes suivent ce schéma minimal :
+Recipes follow this minimal schema:
 
 ```json
 {
@@ -51,54 +51,54 @@ Les recettes suivent ce schéma minimal :
 }
 ```
 
-Les clés JSON utilisent le vocabulaire métier en français (`"Année"`, `"Semaine"`, `"numéro"`, `"ingrédients"`, `"quantité"`). Le LLM ayant tendance à dériver du schéma (ajouter `description`, `instructions`, ou écrire `"ingredients"` sans accent), toute réponse passe par `helpers.normalize_recipe` qui force le shape canonique avant écriture sur disque.
+JSON keys use the French domain vocabulary (`"Année"`, `"Semaine"`, `"numéro"`, `"ingrédients"`, `"quantité"`). Since the LLM tends to drift from the schema (adding `description`, `instructions`, or writing `"ingredients"` without the accent), every response passes through `helpers.normalize_recipe`, which enforces the canonical shape before writing to disk.
 
-### Parsing de la sortie LLM
+### LLM output parsing
 
-`helpers.extract_json` tolère trois formats de réponse :
+`helpers.extract_json` tolerates three response formats:
 
-1. JSON pur ;
-2. JSON encadré par des fences markdown (` ```json … ``` `) ;
-3. JSON noyé dans du texte explicatif.
+1. Plain JSON;
+2. JSON wrapped in markdown fences (` ```json … ``` `);
+3. JSON embedded in explanatory prose.
 
-Le cas (3) utilise `json.JSONDecoder.raw_decode` qui consomme un objet JSON valide depuis n'importe quelle position et ignore le suffixe — robuste aux objets imbriqués (qu'un simple regex non-greedy tronquerait au premier `}`).
+Case (3) uses `json.JSONDecoder.raw_decode`, which consumes a valid JSON object from any position and ignores the suffix — robust to nested objects (which a simple non-greedy regex would truncate at the first `}`).
 
-### Historique injecté dans les prompts
+### History injected into prompts
 
-Pour éviter que Claude reproduise les mêmes plats d'une semaine à l'autre, les prompts 1 (génération) et 4 (remplacement) reçoivent en entrée la liste des recettes des 8 dernières semaines, extraite de `menus.json` par `helpers.get_recent_recipe_names`. Seuls les noms sont transmis (coût token minimal). La ligne est omise quand l'historique est vide (premier lancement). Le tri se fait sur `(année, semaine)` décroissant, à travers toutes les années.
+To prevent Claude from reproducing the same dishes week after week, prompts 1 (generation) and 4 (replacement) receive the list of recipes from the last 8 weeks, extracted from `menus.json` by `helpers.get_recent_recipe_names`. Only names are transmitted (minimal token cost). The line is omitted when history is empty (first run). Sorting is done on `(year, week)` descending, across all years.
 
-### Fuzzy matching des noms de recettes
+### Fuzzy matching of recipe names
 
-Quand l'utilisateur écrit "remplace les pâtes aux courgettes", le LLM (prompt 3) extrait le nom de recette mentionné, mais celui-ci ne matche pas forcément exactement l'entrée stockée. `helpers.find_best_match` (via `thefuzz`) fait un matching avec un seuil de 70 pour résoudre la recette ciblée parmi le menu courant.
+When the user writes "remplace les pâtes aux courgettes", the LLM (prompt 3) extracts the recipe name mentioned, but it may not exactly match the stored entry. `helpers.find_best_match` (via `thefuzz`) fuzzy-matches with a threshold of 70 to resolve the target recipe among the current menu.
 
 ### Caching
 
-Pour éviter des I/O inutiles :
+To avoid unnecessary I/O:
 
-- **Prompts** : `prompts.md` est lu et parsé une seule fois (au premier `load_prompt`), les 4 prompts sont mis en cache module-level.
-- **Client Anthropic** : un singleton lazy est créé au premier appel à `call_llm`.
+- **Prompts**: `prompts.md` is read and parsed once (on the first `load_prompt` call); all 4 prompts are cached at module level.
+- **Anthropic client**: a lazy singleton is created on the first `call_llm` call.
 
 ### Logging
 
-Logs en fichier (`logs.txt`) avec `RotatingFileHandler` pour borner l'espace disque (1 MB par fichier × 3 backups) et duplication sur stdout pour le debug interactif. Les retours bruts du LLM sont loggés pour pouvoir diagnostiquer les drifts de schéma.
+File logging (`logs.txt`) with `RotatingFileHandler` to bound disk usage (1 MB per file × 3 backups), duplicated to stdout for interactive debugging. Raw LLM responses are logged to diagnose schema drift.
 
-### Polling Telegram
+### Telegram polling
 
-Le démon utilise long-polling (`timeout=30` côté Telegram, +5s côté `requests`) plutôt que des webhooks pour éviter d'avoir à exposer un port. L'offset des messages traités est persisté dans `state.json` pour ne pas re-traiter les messages au redémarrage. La sauvegarde se fait une fois par batch reçu, pas par message individuel, pour limiter les fsync.
+The daemon uses long-polling (`timeout=30` on the Telegram side, +5s on the `requests` side) rather than webhooks to avoid exposing a port. The offset of processed messages is persisted in `state.json` to avoid re-processing messages on restart. The save happens once per received batch, not per individual message, to limit fsync calls.
 
-### Retry LLM
+### LLM retry
 
-`call_llm` retry jusqu'à 3 fois avec backoff exponentiel (1s, 2s, 4s) sur n'importe quelle exception. C'est volontairement large : en cas d'erreur d'authentification ou de quota, on relog et on échoue proprement après les 3 tentatives.
+`call_llm` retries up to 3 times with exponential backoff (1s, 2s, 4s) on any exception. This is intentionally broad: on authentication or quota errors, the function re-logs and fails cleanly after the 3 attempts.
 
 ## Prompts
 
-Les 4 prompts sont dans `prompts.md`, dans cet ordre :
+The 4 prompts are in `prompts.md`, in this order:
 
-| # | Rôle |
+| # | Role |
 |---|------|
-| 1 | Génération du menu hebdomadaire (4 recettes, contraintes saisonnalité + équilibre) |
-| 2 | Formatage en message Telegram convivial avec liste de courses consolidée |
-| 3 | Détection d'intention (modifier vs autre) sur les messages utilisateurs |
-| 4 | Génération d'une recette de remplacement compatible avec le menu courant |
+| 1 | Weekly menu generation (4 recipes, seasonality + balance constraints) |
+| 2 | Formatting as a friendly Telegram message with consolidated shopping list |
+| 3 | Intent detection (modify vs. other) on user messages |
+| 4 | Replacement recipe generation compatible with the current menu |
 
-`load_prompt(N)` extrait le bloc correspondant à `## Prompt N`. Cette séparation permet de modifier les prompts sans toucher au code.
+`load_prompt(N)` extracts the block corresponding to `## Prompt N`. This separation allows prompts to be modified without touching the code.

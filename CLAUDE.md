@@ -26,7 +26,7 @@ No build, no linter, no test suite. To smoke-test code paths without sending rea
 
 ## Conventions
 
-- **Language split**: user-facing strings (Telegram messages, logs, prompts in `prompts.md`) are in French. Code, identifiers, docstrings, git commit messages are in English. JSON keys in `menus.json` and `seasons.json` use the French domain vocabulary (`"Année"`, `"Semaine"`, `"numéro"`, `"ingrédients"`, `"quantité"`) — do not translate them.
+- **Language split**: user-facing strings (Telegram bot messages and LLM prompt strings in `prompts.md` and inline prompt-building code) are in French. Everything else — logs, error messages, docstrings, git commit messages, documentation — is in English. JSON keys in `menus.json` and `seasons.json` use the French domain vocabulary (`"Année"`, `"Semaine"`, `"numéro"`, `"ingrédients"`, `"quantité"`) — do not translate them.
 - **Docstrings**: public functions and classes carry docstrings; keep them concise (one line where possible).
 - **Commits**: structured English messages with a one-line summary then a bulleted body. See recent commits for the pattern.
 

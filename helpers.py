@@ -130,7 +130,7 @@ def extract_json(text):
                 return obj
             except json.JSONDecodeError:
                 continue
-    raise ValueError("Aucun JSON trouvé dans la réponse LLM")
+    raise ValueError("No JSON found in LLM response")
 
 
 def normalize_recipe(recipe):
@@ -141,7 +141,7 @@ def normalize_recipe(recipe):
     fields the LLM may have invented (description, instructions, …).
     """
     if not isinstance(recipe, dict):
-        raise ValueError(f"Recette invalide : {recipe!r}")
+        raise ValueError(f"Invalid recipe: {recipe!r}")
     nom = recipe.get("nom") or recipe.get("name") or ""
     raw = recipe.get("ingrédients") or recipe.get("ingredients") or []
     ingredients = []
@@ -164,7 +164,7 @@ def normalize_recipe(recipe):
 def normalize_recipes(recipes):
     """Apply normalize_recipe to a list of recipes."""
     if not isinstance(recipes, list):
-        raise ValueError(f"Liste de recettes attendue : {recipes!r}")
+        raise ValueError(f"Expected a list of recipes: {recipes!r}")
     return [normalize_recipe(r) for r in recipes]
 
 
@@ -192,7 +192,7 @@ class LockFile:
             os.close(self.fd)
             self.fd = None
             raise
-        logging.info("Lock acquis %s (bloquant=%s)", self.path, self.blocking)
+        logging.info("Lock acquired %s (blocking=%s)", self.path, self.blocking)
         return self
 
     def __exit__(self, *args):
@@ -200,7 +200,7 @@ class LockFile:
             fcntl.flock(self.fd, fcntl.LOCK_UN)
             os.close(self.fd)
             self.fd = None
-            logging.info("Lock libéré %s", self.path)
+            logging.info("Lock released %s", self.path)
 
 
 _client = None
@@ -211,7 +211,7 @@ def _anthropic_client():
     if _client is None:
         key = os.getenv("ANTHROPIC_API_KEY")
         if not key:
-            raise RuntimeError("ANTHROPIC_API_KEY non définie")
+            raise RuntimeError("ANTHROPIC_API_KEY is not set")
         url = os.getenv("ANTHROPIC_BASE_URL")
         if not url:
             _client = anthropic.Anthropic(api_key=key)
@@ -225,7 +225,7 @@ def call_llm(system_prompt, user_message, max_retries=3):
     content block. Raises after the final failed attempt.
     """
     client = _anthropic_client()
-    logging.info(f"User message passé au LLM : {user_message}")
+    logging.info(f"User message sent to LLM: {user_message}")
     for attempt in range(max_retries):
         try:
             response = client.messages.create(
@@ -236,15 +236,15 @@ def call_llm(system_prompt, user_message, max_retries=3):
                 messages=[{"role": "user", "content": user_message}],
             )
             text = response.content[0].text
-            logging.info(f"Retour du LLM : {text}")
+            logging.info(f"LLM response: {text}")
             logging.info("LLM ok (%d tokens)", response.usage.output_tokens)
             return text
         except Exception as e:
             logging.warning(
-                "LLM échec tentative %d/%d: %s", attempt + 1, max_retries, e
+                "LLM attempt %d/%d failed: %s", attempt + 1, max_retries, e
             )
             if attempt == max_retries - 1:
-                logging.error("LLM abandon après %d tentatives", max_retries)
+                logging.error("LLM giving up after %d attempts", max_retries)
                 raise
             time.sleep(2**attempt)
 
@@ -258,7 +258,7 @@ def send_telegram(message):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
-        logging.info("Telegram non configuré — message loggé seulement")
+        logging.info("Telegram not configured — logging message only")
         logging.info("=== MESSAGE ===\n%s\n===============", message)
         return
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -269,9 +269,9 @@ def send_telegram(message):
             timeout=10,
         )
         resp.raise_for_status()
-        logging.info("Telegram envoyé")
+        logging.info("Telegram message sent")
     except Exception as e:
-        logging.error("Échec envoi Telegram: %s", e)
+        logging.error("Telegram send failed: %s", e)
 
 
 def get_updates(offset=0, timeout=30):
@@ -282,7 +282,7 @@ def get_updates(offset=0, timeout=30):
     """
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
-        logging.warning("TELEGRAM_BOT_TOKEN non défini — pas de polling")
+        logging.warning("TELEGRAM_BOT_TOKEN not set — skipping polling")
         return []
     url = f"https://api.telegram.org/bot{token}/getUpdates"
     try:
@@ -295,7 +295,7 @@ def get_updates(offset=0, timeout=30):
     except requests.Timeout:
         return []
     except Exception as e:
-        logging.error("Échec polling Telegram: %s", e)
+        logging.error("Telegram polling failed: %s", e)
         return []
 
 
@@ -344,7 +344,7 @@ def load_prompt(num):
             end = headers[i + 1].start() if i + 1 < len(headers) else len(text)
             _PROMPTS[int(match.group(1))] = text[start:end].strip()
     if num not in _PROMPTS:
-        msg = f"Prompt #{num} introuvable dans prompts.md"
+        msg = f"Prompt #{num} not found in prompts.md"
         logging.error(msg)
         raise ValueError(msg)
     return _PROMPTS[num]
