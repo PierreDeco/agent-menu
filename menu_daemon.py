@@ -62,7 +62,7 @@ def main():
     """
     setup_logging()
     logger = logging.getLogger("Daemon")
-    logger.info("Agent démarré")
+    logger.info("Agent started")
 
     offset = load_state().get("offset", 0)
 
@@ -70,7 +70,7 @@ def main():
         try:
             updates = get_updates(offset=offset)
         except Exception as e:
-            logger.error("Erreur polling: %s", e)
+            logger.error("Polling error: %s", e)
             time.sleep(10)
             continue
 
@@ -86,10 +86,10 @@ def main():
             if not text:
                 continue
 
-            logger.info("Message reçu: %s", text[:100])
+            logger.info("Message received: %s", text[:100])
 
             if text.startswith("/recettes"):
-                logger.info("Commande /recettes reçue")
+                logger.info("Command /recettes received")
                 try:
                     with LockFile(blocking=False):
                         generate_menu()
@@ -98,7 +98,7 @@ def main():
                         "Génération déjà en cours, réessaie dans quelques minutes."
                     )
                 except Exception as e:
-                    logger.error("Erreur génération menu: %s", e)
+                    logger.error("Menu generation error: %s", e)
                     send_telegram(f"Erreur lors de la génération : {e}")
             else:
                 try:
@@ -110,7 +110,7 @@ def main():
                         "Réessaie dans quelques minutes."
                     )
                 except Exception as e:
-                    logger.error("Erreur traitement message: %s", e)
+                    logger.error("Message processing error: %s", e)
                     send_telegram(f"Erreur lors du traitement : {e}")
 
         if updates:
@@ -145,7 +145,7 @@ def _handle_modification(user_text):
 
     original_name = intent.get("recette_originale", "")
     raison = intent.get("raison", "")
-    logger.info("Demande de modification: %s → %s", original_name, raison)
+    logger.info("Modification request: %s → %s", original_name, raison)
 
     menus = load_menus()
     current_menu = get_current_week_menu(menus, year, week)
@@ -186,7 +186,7 @@ def _handle_modification(user_text):
             f"Impossible de remplacer la recette \"{original_name}\"."
         )
         return
-    logger.info("Recette remplacée: %s", original_name)
+    logger.info("Recipe replaced: %s", original_name)
 
     updated_menu = get_current_week_menu(menus, year, week)
     prompt2 = load_prompt(2)

@@ -85,4 +85,4 @@ def generate_menu():
     send_telegram(formatted)
     save_week(menus, year, week, recipes)
 
-    logger.info("Menu semaine %d/%d généré avec succès", week, year)
+    logger.info("Week %d/%d menu generated successfully", week, year)
