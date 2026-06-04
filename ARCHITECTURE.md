@@ -6,23 +6,25 @@ This document describes the design decisions of `agent-menu`. For installation a
 
 ```
                                   ┌────────────────────┐
-   Telegram /recettes  ─────────▶ │                    │ ──▶ generate_menu()  ─┐
-                                  │   menu_daemon.py   │                       │
-   Telegram message libre ─────▶  │ (long-polling)     │ ──▶ _handle_modif()  ─┤
-                                  └────────────────────┘                       │
-                                                                  menu.lock    │
-                                                                               ▼
-                                                                       ┌────────────┐
-                                                                       │ menus.json │
-                                                                       └────────────┘
+   Telegram /recettes  ─────────▶ │                    │ ──▶ generate_menu()    ─┐
+                                  │   menu_daemon.py   │                         │
+   Telegram /remplace  ─────────▶ │ (long-polling)     │ ──▶ _handle_remplace() ─┤
+                                  │                    │                         │
+   Telegram autre      ─────────▶ │                    │ ──▶ usage hint          │
+                                  └────────────────────┘        menu.lock        │
+                                                                                 ▼
+                                                                         ┌────────────┐
+                                                                         │ menus.json │
+                                                                         └────────────┘
 ```
 
-A single daemon (`menu_daemon.py`) listens to Telegram and delegates to two functions based on the message:
+A single daemon (`menu_daemon.py`) listens to Telegram and routes each message to one of three handlers:
 
-- `menu_generator.generate_menu()` — generates the current week's menu.
-- `_handle_modification()` (internal to the daemon) — applies a recipe replacement.
+- `menu_generator.generate_menu()` — generates the current week's menu (triggered by `/recettes`).
+- `_handle_remplace()` (internal to the daemon) — applies a recipe replacement (triggered by `/remplace <recette>`).
+- A usage hint listing available commands — for any other message.
 
-The daemon always acquires a non-blocking lock on `menus.json` before invoking either. The lock ensures a cron job running `generate_menu` in parallel does not corrupt the file.
+The daemon always acquires a non-blocking lock on `menus.json` before invoking either write-path handler.
 
 ## Design decisions
 

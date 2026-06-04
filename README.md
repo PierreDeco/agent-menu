@@ -1,13 +1,14 @@
 # agent-menu
 
-Weekly meal-planning agent powered by Claude and driven by Telegram. Generates 4 seasonal, balanced, mostly vegetarian meal ideas each week, delivered on Telegram with a consolidated shopping list. The user can request a recipe replacement directly by message.
+Weekly meal-planning agent powered by Claude and driven by Telegram. Generates 4 seasonal, balanced, mostly vegetarian meal ideas each week, delivered on Telegram with a consolidated shopping list. The user can request a recipe replacement via the `/remplace` command.
 
 ## How it works
 
-The project relies on a single daemon, **`menu_daemon.py`**, which listens to Telegram via long-polling and orchestrates two flows:
+The project relies on a single daemon, **`menu_daemon.py`**, which listens to Telegram via long-polling and routes messages to one of three handlers:
 
-- **Generation** — on the `/recettes` command, the daemon calls `menu_generator.generate_menu()` to produce the current week's menu and send it on Telegram.
-- **Modification** — on any other message, the daemon detects the intent via Claude and replaces a recipe in the current menu.
+- **`/recettes`** — calls `menu_generator.generate_menu()` to produce the current week's menu and send it on Telegram.
+- **`/remplace <recette>`** — fuzzy-matches the named recipe in the current menu, asks Claude for a season-compatible replacement, updates `menus.json`, and sends back the updated menu.
+- **Anything else** — sends a usage hint listing the available commands.
 
 During both generation and replacement, Claude also receives the list of recipes from the last 8 weeks (extracted from `menus.json`) to avoid re-proposing the same dishes.
 
@@ -70,15 +71,18 @@ Since `menu_generator.py` is not directly executable, two options:
 with LockFile(): generate_menu()"
 ```
 
-### Telegram message examples
+### Replacing a recipe
 
-Once the daemon is running, write to the bot to request a change:
+Send `/remplace <recipe name>` to the bot:
 
-> "Remplace les pâtes aux courgettes, je n'ai pas envie de pâtes cette semaine"
+```
+/remplace Pâtes aux courgettes
+/remplace salade de betteraves
+```
 
-> "Change la salade de betteraves, je n'aime pas la betterave"
+The bot fuzzy-matches the name against the current week's recipes, asks Claude for a season-compatible replacement, updates `menus.json`, and sends back the updated menu.
 
-The bot identifies the targeted recipe (fuzzy matching), asks Claude to suggest a season-compatible replacement, updates `menus.json`, and sends back the updated menu.
+If the name isn't recognized, the bot lists the current week's recipes and asks you to retry with the exact name.
 
 ## Project layout
 

@@ -52,8 +52,9 @@ def replace_recipe_in_menu(menus, year, week, original_name, new_recipe):
 
 def main():
     """Long-poll Telegram.
-    Also generates menus on the "/recettes" command call or modifies
-    menu on user's demand.
+
+    Routes /recettes to menu generation, /remplace <recette> to recipe
+    replacement, and anything else to a usage hint.
 
     Persists the Telegram update offset in state.json so messages
     aren't re-processed after a restart. Takes a non-blocking lock on
@@ -100,29 +101,42 @@ def main():
                 except Exception as e:
                     logger.error("Menu generation error: %s", e)
                     send_telegram(f"Erreur lors de la génération : {e}")
-            else:
-                try:
-                    with LockFile(blocking=False):
-                        _handle_modification(text)
-                except BlockingIOError:
+            elif text.startswith("/remplace"):
+                recipe_name = text[len("/remplace"):].strip()
+                logger.info("Command /remplace received: %s", recipe_name[:100])
+                if not recipe_name:
                     send_telegram(
-                        "Le menu est en cours de génération. "
-                        "Réessaie dans quelques minutes."
+                        "Utilisation : /remplace <nom de la recette>\n"
+                        "Exemple : /remplace Pâtes aux courgettes"
                     )
-                except Exception as e:
-                    logger.error("Message processing error: %s", e)
-                    send_telegram(f"Erreur lors du traitement : {e}")
+                else:
+                    try:
+                        with LockFile(blocking=False):
+                            _handle_remplace(recipe_name)
+                    except BlockingIOError:
+                        send_telegram(
+                            "Le menu est en cours de génération. "
+                            "Réessaie dans quelques minutes."
+                        )
+                    except Exception as e:
+                        logger.error("Replacement error: %s", e)
+                        send_telegram(f"Erreur lors du remplacement : {e}")
+            else:
+                send_telegram(
+                    "Commandes disponibles :\n"
+                    "• /recettes — générer le menu de la semaine\n"
+                    "• /remplace <recette> — remplacer une recette du menu"
+                )
 
         if updates:
             save_state({"offset": offset})
 
 
-def _handle_modification(user_text):
-    """Run the full modification flow for one user message.
+def _handle_remplace(recipe_name):
+    """Replace a recipe in the current week's menu on explicit user request.
 
-    Pipeline: intent detection (prompt 3) → fuzzy-match the target
-    recipe → ask Claude for a replacement (prompt 4) → write to disk →
-    send an updated recap (prompt 2).
+    Pipeline: fuzzy-match recipe_name against current menu → generate a
+    replacement (prompt 4) → write to disk → send an updated recap (prompt 2).
     """
     logger = logging.getLogger("menu_daemon")
 
@@ -131,22 +145,6 @@ def _handle_modification(user_text):
     week = week_info["week"]
     season = week_info["season"]
 
-    prompt3 = load_prompt(3)
-    msg_intent = (
-        f'Message utilisateur : "{user_text}"\n'
-        f"Semaine courante : {week} ({week_info['month_name']} {year})"
-    )
-    intent_raw = call_llm(prompt3, msg_intent)
-    intent = extract_json(intent_raw)
-
-    if intent.get("intention") != "modifier":
-        logger.info("Message ignoré (intention: %s)", intent.get("intention"))
-        return
-
-    original_name = intent.get("recette_originale", "")
-    raison = intent.get("raison", "")
-    logger.info("Modification request: %s → %s", original_name, raison)
-
     menus = load_menus()
     current_menu = get_current_week_menu(menus, year, week)
     if current_menu is None:
@@ -154,20 +152,25 @@ def _handle_modification(user_text):
         return
 
     candidates = [r["nom"] for r in current_menu]
-    matched = find_best_match(original_name, candidates)
+    matched = find_best_match(recipe_name, candidates)
     if not matched:
-        liste = ", ".join(candidates)
-        send_telegram(f"Je n'ai pas trouvé \"{original_name}\" dans le menu. Recettes disponibles : {liste}")
+        liste = "\n".join(f"• {n}" for n in candidates)
+        send_telegram(
+            f"Je n'ai pas trouvé « {recipe_name} » dans le menu. "
+            f"Recettes de cette semaine :\n{liste}\n\n"
+            f"Réessaie avec : /remplace <nom exact>"
+        )
         return
-    original_name = matched
+
+    logger.info("Replacing recipe: %s", matched)
 
     seasons = load_seasons()
     ingredients = ", ".join(seasons.get(season, []))
 
     prompt4 = load_prompt(4)
     msg_replace = (
-        f'Recette à remplacer : "{original_name}".\n'
-        f"Raison : {raison}.\n"
+        f'Recette à remplacer : "{matched}".\n'
+        f"Raison : à la demande de l'utilisateur.\n"
         f"Saison : {season}. Ingrédients de saison : {ingredients}.\n"
     )
     recent = get_recent_recipe_names(menus)
@@ -181,12 +184,10 @@ def _handle_modification(user_text):
     new_recipe_raw = call_llm(prompt4, msg_replace)
     new_recipe = normalize_recipe(extract_json(new_recipe_raw))
 
-    if not replace_recipe_in_menu(menus, year, week, original_name, new_recipe):
-        send_telegram(
-            f"Impossible de remplacer la recette \"{original_name}\"."
-        )
+    if not replace_recipe_in_menu(menus, year, week, matched, new_recipe):
+        send_telegram(f"Impossible de remplacer la recette « {matched} ».")
         return
-    logger.info("Recipe replaced: %s", original_name)
+    logger.info("Recipe replaced: %s → %s", matched, new_recipe.get("nom"))
 
     updated_menu = get_current_week_menu(menus, year, week)
     prompt2 = load_prompt(2)
