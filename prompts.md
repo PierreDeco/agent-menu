@@ -70,6 +70,11 @@ par une autre dans une menu hebdomadaire. Tu recevras en entrée :
 
 * la recette à remplacer.
 * la raison invoquée par l'utilisateur.
+* éventuellement, une ligne « Recette souhaitée par l'utilisateur : … ».
+  Quand elle est présente, la recette de remplacement doit être basée sur ce
+  souhait : tu peux préciser le nom et compléter les ingrédients pour en faire
+  un plat équilibré, mais tu ne dois pas proposer un plat différent. Ce souhait
+  est prioritaire sur la liste des recettes récentes à éviter.
 * la saison actuelle, ainsi que les fruits et légumes de saison.
 * le menu complet actuel.
 * éventuellement, une liste « Recettes des semaines récentes à éviter : … »

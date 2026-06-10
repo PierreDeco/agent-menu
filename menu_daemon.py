@@ -54,7 +54,8 @@ def main():
     """Long-poll Telegram.
 
     Routes /recettes to menu generation, /remplace <recette> to recipe
-    replacement, and anything else to a usage hint.
+    replacement, /remplacepar <recette> | <souhait> to replacement by a
+    user-chosen recipe, and anything else to a usage hint.
 
     Persists the Telegram update offset in state.json so messages
     aren't re-processed after a restart. Takes a non-blocking lock on
@@ -101,6 +102,30 @@ def main():
                 except Exception as e:
                     logger.error("Menu generation error: %s", e)
                     send_telegram(f"Erreur lors de la génération : {e}")
+            elif text.startswith("/remplacepar"):
+                args = text[len("/remplacepar"):].strip()
+                logger.info("Command /remplacepar received: %s", args[:100])
+                existing, sep, desired = args.partition("|")
+                existing = existing.strip()
+                desired = desired.strip()
+                if not sep or not existing or not desired:
+                    send_telegram(
+                        "Utilisation : /remplacepar <recette du menu> | "
+                        "<recette souhaitée>\n"
+                        "Exemple : /remplacepar poulet frites | pâtes au pesto"
+                    )
+                else:
+                    try:
+                        with LockFile(blocking=False):
+                            _handle_remplace(existing, desired=desired)
+                    except BlockingIOError:
+                        send_telegram(
+                            "Le menu est en cours de génération. "
+                            "Réessaie dans quelques minutes."
+                        )
+                    except Exception as e:
+                        logger.error("Replacement error: %s", e)
+                        send_telegram(f"Erreur lors du remplacement : {e}")
             elif text.startswith("/remplace"):
                 recipe_name = text[len("/remplace"):].strip()
                 logger.info("Command /remplace received: %s", recipe_name[:100])
@@ -125,18 +150,22 @@ def main():
                 send_telegram(
                     "Commandes disponibles :\n"
                     "• /recettes — générer le menu de la semaine\n"
-                    "• /remplace <recette> — remplacer une recette du menu"
+                    "• /remplace <recette> — remplacer une recette du menu\n"
+                    "• /remplacepar <recette> | <souhait> — remplacer une "
+                    "recette par celle de ton choix"
                 )
 
         if updates:
             save_state({"offset": offset})
 
 
-def _handle_remplace(recipe_name):
+def _handle_remplace(recipe_name, desired=None):
     """Replace a recipe in the current week's menu on explicit user request.
 
     Pipeline: fuzzy-match recipe_name against current menu → generate a
     replacement (prompt 4) → write to disk → send an updated recap (prompt 2).
+    When `desired` is given, the replacement is based on that user wish
+    instead of being freely chosen by the LLM.
     """
     logger = logging.getLogger("menu_daemon")
 
@@ -171,8 +200,10 @@ def _handle_remplace(recipe_name):
     msg_replace = (
         f'Recette à remplacer : "{matched}".\n'
         f"Raison : à la demande de l'utilisateur.\n"
-        f"Saison : {season}. Ingrédients de saison : {ingredients}.\n"
     )
+    if desired:
+        msg_replace += f'Recette souhaitée par l\'utilisateur : "{desired}".\n'
+    msg_replace += f"Saison : {season}. Ingrédients de saison : {ingredients}.\n"
     recent = get_recent_recipe_names(menus)
     if recent:
         msg_replace += (
