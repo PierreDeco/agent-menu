@@ -1,13 +1,14 @@
 # agent-menu
 
-Weekly meal-planning agent powered by Claude and driven by Telegram. Generates 4 seasonal, balanced, mostly vegetarian meal ideas each week, delivered on Telegram with a consolidated shopping list. The user can request a recipe replacement via the `/remplace` command.
+Weekly meal-planning agent powered by Claude and driven by Telegram. Generates 4 seasonal, balanced, mostly vegetarian meal ideas each week, delivered on Telegram with a consolidated shopping list. The user can request a recipe replacement via the `/remplace` command, or replace a recipe with a dish of their choice via `/remplacepar`.
 
 ## How it works
 
-The project relies on a single daemon, **`menu_daemon.py`**, which listens to Telegram via long-polling and routes messages to one of three handlers:
+The project relies on a single daemon, **`menu_daemon.py`**, which listens to Telegram via long-polling and routes messages to one of four handlers:
 
 - **`/recettes`** — calls `menu_generator.generate_menu()` to produce the current week's menu and send it on Telegram.
 - **`/remplace <recette>`** — fuzzy-matches the named recipe in the current menu, asks Claude for a season-compatible replacement, updates `menus.json`, and sends back the updated menu.
+- **`/remplacepar <recette> | <souhait>`** — same as `/remplace`, but the replacement is based on the dish requested after the `|` (Claude may refine the name and fill in the ingredients).
 - **Anything else** — sends a usage hint listing the available commands.
 
 During both generation and replacement, Claude also receives the list of recipes from the last 8 weeks (extracted from `menus.json`) to avoid re-proposing the same dishes.
@@ -83,6 +84,16 @@ Send `/remplace <recipe name>` to the bot:
 The bot fuzzy-matches the name against the current week's recipes, asks Claude for a season-compatible replacement, updates `menus.json`, and sends back the updated menu.
 
 If the name isn't recognized, the bot lists the current week's recipes and asks you to retry with the exact name.
+
+### Replacing a recipe with a dish of your choice
+
+Send `/remplacepar <recipe name> | <desired dish>` to the bot:
+
+```
+/remplacepar poulet frites | pâtes au pesto
+```
+
+The part before the `|` is fuzzy-matched against the current week's recipes like `/remplace`; the part after is the dish you want instead. Claude bases the replacement on your wish — it may refine the name and fills in the ingredient list — then updates `menus.json` and sends back the updated menu.
 
 ## Project layout
 
