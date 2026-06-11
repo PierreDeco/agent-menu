@@ -8,7 +8,7 @@ This document describes the design decisions of `agent-menu`. For installation a
                                   ┌────────────────────┐
    Telegram /recettes  ─────────▶ │                    │ ──▶ generate_menu()    ─┐
                                   │   menu_daemon.py   │                         │
-   Telegram /remplace  ─────────▶ │ (long-polling)     │ ──▶ _handle_remplace() ─┤
+   Telegram /remplace[par] ─────▶ │ (long-polling)     │ ──▶ _handle_remplace() ─┤
                                   │                    │                         │
    Telegram autre      ─────────▶ │                    │ ──▶ usage hint          │
                                   └────────────────────┘        menu.lock        │
@@ -21,7 +21,7 @@ This document describes the design decisions of `agent-menu`. For installation a
 A single daemon (`menu_daemon.py`) listens to Telegram and routes each message to one of three handlers:
 
 - `menu_generator.generate_menu()` — generates the current week's menu (triggered by `/recettes`).
-- `_handle_remplace()` (internal to the daemon) — applies a recipe replacement (triggered by `/remplace <recette>`).
+- `_handle_remplace()` (internal to the daemon) — applies a recipe replacement (triggered by `/remplace <recette>`, or by `/remplacepar <recette> | <souhait>` when the user names the replacement dish).
 - A usage hint listing available commands — for any other message.
 
 The daemon always acquires a non-blocking lock on `menus.json` before invoking either write-path handler.

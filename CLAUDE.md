@@ -15,10 +15,11 @@ pip install -r requirements.txt   # install deps
 python menu_daemon.py             # long-running Telegram listener
 ```
 
-The daemon routes three commands:
+The daemon routes four cases:
 
 - `/recettes` — generates the current week's menu via `menu_generator.generate_menu()`
 - `/remplace <recette>` — fuzzy-matches the named recipe and generates a replacement
+- `/remplacepar <recette> | <souhait>` — fuzzy-matches the recipe before the `|` and replaces it with the dish requested after the `|`
 - anything else — sends a usage hint
 
 `menu_generator.py` exposes `generate_menu()` as a library function — it has no `__main__` block.
@@ -33,7 +34,7 @@ No build, no linter, no test suite. To smoke-test code paths without sending rea
 
 ## Things to know when editing
 
-- `menu_daemon.py` orchestrates both flows (generation on `/recettes`, recipe replacement on `/remplace`). It always holds the lock on `menus.json` before calling into `menu_generator` or `_handle_remplace`. Any new code that writes to `menus.json` must hold the lock via `LockFile`.
+- `menu_daemon.py` orchestrates both flows (generation on `/recettes`, recipe replacement on `/remplace` and `/remplacepar`). It always holds the lock on `menus.json` before calling into `menu_generator` or `_handle_remplace`. Any new code that writes to `menus.json` must hold the lock via `LockFile`.
 - LLM output drifts from the documented schema. Always pipe `extract_json` output through `normalize_recipe` / `normalize_recipes` before writing to disk or comparing names. The canonical recipe shape is `{nom, ingrédients: [{nom, quantité}]}` — anything else gets coerced or dropped.
 - Prompts live in `prompts.md` and are addressed by header (`## Prompt N`). Adding a new prompt: append a `## Prompt N` section, access it via `helpers.load_prompt(N)`. Parsing is cached at first call.
 - Prompts 1 and 4 receive an optional `"Recettes des semaines récentes à éviter : …"` line, built by `helpers.get_recent_recipe_names(menus, n=8)` from `menus.json`. The history is the 8 most recent weeks across all years (sorted by `(year, week)` descending), names only. The line is omitted entirely when no history exists.
