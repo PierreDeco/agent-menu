@@ -3,3 +3,5 @@ python-dotenv>=1.0.0
 requests>=2.32.0
 thefuzz>=0.22.0
 python-Levenshtein>=0.26.0
+Flask>=3.0.0
+markdown>=3.6
