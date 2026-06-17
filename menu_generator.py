@@ -1,11 +1,7 @@
-#!/usr/bin/env python3
 import json
-import sys
 
 from helpers import (
-    setup_logging,
     logging,
-    LockFile,
     load_menus,
     save_menus,
     load_seasons,
@@ -78,9 +74,7 @@ def generate_menu():
     recipes = normalize_recipes(parsed)
 
     prompt2 = load_prompt(2)
-    formatted = call_llm(
-        prompt2, json.dumps(recipes, ensure_ascii=False, indent=2)
-    )
+    formatted = call_llm(prompt2, json.dumps(recipes, ensure_ascii=False, indent=2))
 
     send_telegram(formatted)
     save_week(menus, year, week, recipes)

@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
 import json
 import time
-import sys
 
 from helpers import (
     setup_logging,
@@ -103,7 +101,7 @@ def main():
                     logger.error("Menu generation error: %s", e)
                     send_telegram(f"Erreur lors de la génération : {e}")
             elif text.startswith("/remplacepar"):
-                args = text[len("/remplacepar"):].strip()
+                args = text[len("/remplacepar") :].strip()
                 logger.info("Command /remplacepar received: %s", args[:100])
                 existing, sep, desired = args.partition("|")
                 existing = existing.strip()
@@ -127,7 +125,7 @@ def main():
                         logger.error("Replacement error: %s", e)
                         send_telegram(f"Erreur lors du remplacement : {e}")
             elif text.startswith("/remplace"):
-                recipe_name = text[len("/remplace"):].strip()
+                recipe_name = text[len("/remplace") :].strip()
                 logger.info("Command /remplace received: %s", recipe_name[:100])
                 if not recipe_name:
                     send_telegram(
@@ -222,9 +220,7 @@ def _handle_remplace(recipe_name, desired=None):
 
     updated_menu = get_current_week_menu(menus, year, week)
     prompt2 = load_prompt(2)
-    recap = call_llm(
-        prompt2, json.dumps(updated_menu, ensure_ascii=False, indent=2)
-    )
+    recap = call_llm(prompt2, json.dumps(updated_menu, ensure_ascii=False, indent=2))
     send_telegram(recap)
 
 

@@ -5,7 +5,7 @@ import logging.handlers
 import fcntl
 import re
 import time
-from datetime import datetime, date
+from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -147,15 +147,17 @@ def normalize_recipe(recipe):
     ingredients = []
     for item in raw:
         if isinstance(item, dict):
-            ingredients.append({
-                "nom": item.get("nom") or item.get("name") or "",
-                "quantité": (
-                    item.get("quantité")
-                    or item.get("quantite")
-                    or item.get("quantity")
-                    or ""
-                ),
-            })
+            ingredients.append(
+                {
+                    "nom": item.get("nom") or item.get("name") or "",
+                    "quantité": (
+                        item.get("quantité")
+                        or item.get("quantite")
+                        or item.get("quantity")
+                        or ""
+                    ),
+                }
+            )
         elif isinstance(item, str):
             ingredients.append({"nom": item, "quantité": ""})
     return {"nom": nom, "ingrédients": ingredients}
@@ -240,9 +242,7 @@ def call_llm(system_prompt, user_message, max_retries=3):
             logging.info("LLM ok (%d tokens)", response.usage.output_tokens)
             return text
         except Exception as e:
-            logging.warning(
-                "LLM attempt %d/%d failed: %s", attempt + 1, max_retries, e
-            )
+            logging.warning("LLM attempt %d/%d failed: %s", attempt + 1, max_retries, e)
             if attempt == max_retries - 1:
                 logging.error("LLM giving up after %d attempts", max_retries)
                 raise
