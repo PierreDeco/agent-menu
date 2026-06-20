@@ -1,0 +1,51 @@
+{
+  "format": {
+    "type": "json_schema",
+    "schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "numéro": {
+          "type": "integer"
+        },
+        "menu": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "nom": {
+                "type": "string"
+              },
+              "ingrédients": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "nom": {
+                      "type": "string"
+                    },
+                    "quantité": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "nom",
+                    "quantité"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "nom",
+              "ingrédients"
+            ]
+          }
+        }
+      },
+      "required": [
+        "numéro",
+        "menu"
+      ]
+    }
+  }
+}
