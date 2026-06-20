@@ -104,6 +104,12 @@ def save_state(data):
     save_json(STATE_PATH, data)
 
 
+def get_current_week_menu(menus, year, week):
+    """Return the list of recipes for (year, week), or None if absent."""
+    entry = find_week_entry(menus, year, week)
+    return entry.get("menu", []) if entry else None
+
+
 def extract_json(text):
     """Extract a JSON object/array from LLM output.
 
