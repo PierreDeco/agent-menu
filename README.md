@@ -1,115 +1,58 @@
-# agent-menu
+#### Video demo : https://youtu.be/P-YnNxRFSkQ
 
-Weekly meal-planning agent powered by Claude and driven by Telegram. Generates 4 seasonal, balanced, mostly vegetarian meal ideas each week, delivered on Telegram with a consolidated shopping list. The user can request a recipe replacement via the `/remplace` command, or replace a recipe with a dish of their choice via `/remplacepar`.
+#### Description :
+##### General idea
 
-## How it works
+Denis is a personal recipe generator. It is powered by a daemon running on a raspberry pi that uses LLM calls to generate recipes.
+By default, it generates a seasonal menu for 2-3 persons. It can also modify the last generated menu.
 
-The project relies on a single daemon, **`menu_daemon.py`**, which listens to Telegram via long-polling and routes messages to one of four handlers:
+##### The Telegram bot
 
-- **`/recettes`** — calls `menu_generator.generate_menu()` to produce the current week's menu and send it on Telegram.
-- **`/remplace <recette>`** — fuzzy-matches the named recipe in the current menu, asks Claude for a season-compatible replacement, updates `menus.json`, and sends back the updated menu.
-- **`/remplacepar <recette> | <souhait>`** — same as `/remplace`, but the replacement is based on the dish requested after the `|` (Claude may refine the name and fill in the ingredients).
-- **Anything else** — sends a usage hint listing the available commands.
+The telegram bot includes three commands :
+- /recettes (stands for recipes) to generate the menu (basically the same as the web-app behavior)
+- /remplace \<recipe\> (stands for replace) to replace a recipe that the user doesn't want.
+- /remplacepar \<recipe\> | \<desired\> (stands for replaceby) to replace a recipe by something the user wants.
+##### Design choices
 
-During both generation and replacement, Claude also receives the list of recipes from the last 8 weeks (extracted from `menus.json`) to avoid re-proposing the same dishes.
+###### Replacement mechanics
 
-`menu_generator.py` has no CLI entry point: `generate_menu()` is a library function called by the daemon (which already holds the lock on `menus.json`).
+To replace correctly a recipe, a fuzzy matching function is defined, where a curated score of 70 must be reached. This function uses the "thefuzz" python module.
 
-For design decisions, see [ARCHITECTURE.md](ARCHITECTURE.md).
+###### Lockfile
 
-## Installation
+A system of non-blocking Lockfile is in place to avoid several writings to the menus.json. This system uses the fnctl library. This lockfile system has been entirely thought by and constructed by an coding agent as I had not foreseen this problem myself.
 
-Prerequisites: Python 3.9+, an Anthropic API key, a Telegram bot.
+###### The LLM calls
 
-```bash
-git clone https://github.com/PierreDeco/agent-menu.git
-cd agent-menu
-pip install -r requirements.txt
-```
+It uses 4 system prompts in French, but can probably be optimized to use only three.
+Prompt 1 asks the LLM to generate a menu. It's the base one. It explains the LLM that it's gonna be asked to generate a menu given these inputs :
+- The year
+- The week number
+- The actual season
+- The seasonal ingredients
+- The expected output template
+- The previous week's menu to avoid repetition
 
-## Configuration
+Prompt 2 explains that it will take a menu JSON as an input, and will be asked to generate a cheerful message introducing the menu and the associated shopping list. This output message is then sent to the web-app and the Telegram bot.
 
-Copy `.env.example` to `.env` then fill in your secrets:
+Prompt 3 receives an input from the user and asks to determine what the user intent is. The first version of the telegram bot did not include a command (the input was raw text). The LLM was then here to detect the intent from this message. With the implementation of commands (the /remplace and /remplacepar), the intent detection logic can be skipped).
 
-```bash
-cp .env.example .env
-```
+Prompt 4 is basically the same as prompt 1, but the LLM is asked to modify a provided menu. It is given :
+- The recipe to be replaced
+- a reason (facultative)
+- a desired recipe from the user (facultative but present with the use of /replacepar)
+- the actual season with its fruits and vegetables
+- the complete week menu
+- the previous week's menu to avoid repetition
+- The expected output template
 
-Environment variables:
+###### JSON parsing
+As the LLM is probabilistic by nature, I had to manage the case where the LLM, although asked to return a raw json only, returns a json with markdown tags or text around it. The extract_json() function manages these three cases.
+The first case manages a raw json output.
+The second case manages the case of a json surrounded by markdown tags
+the third case manages the case of a json surrounded by text
 
-| Variable | Description |
-|----------|-------------|
-| `ANTHROPIC_API_KEY` | Claude API key (required) |
-| `ANTHROPIC_MODEL` | Model to use (default: `claude-haiku-4-5-20251001`) |
-| `TELEGRAM_BOT_TOKEN` | Bot token obtained via `@BotFather` |
-| `TELEGRAM_CHAT_ID` | ID of the chat that receives the menus |
+This part will be improved as I've noticed while reading the Anthropic docs that we could get structured output out of the LLM directly.
 
-If `TELEGRAM_BOT_TOKEN` or `TELEGRAM_CHAT_ID` is missing, messages are written to logs only — handy for testing.
-
-## Usage
-
-### Starting the daemon
-
-```bash
-python menu_daemon.py
-```
-
-The daemon runs continuously and can be supervised by `systemd`, `supervisord`, or `tmux`.
-
-### Manually generating a menu
-
-Send `/recettes` to the Telegram bot: the daemon generates the current ISO week's menu, saves it to `menus.json`, and sends it on Telegram.
-
-### Automatic generation (cron)
-
-Since `menu_generator.py` is not directly executable, two options:
-
-- **Recommended**: schedule the `/recettes` message each week via an automated Telegram client.
-- **Alternative**: invoke the function from cron, wrapping the lock acquisition. Note: only run this when the daemon is stopped, otherwise the lock will block.
-
-```cron
-0 8 * * 1 cd /path/to/agent-menu && /usr/bin/python3 -c "from helpers import setup_logging, LockFile; from menu_generator import generate_menu; setup_logging()
-with LockFile(): generate_menu()"
-```
-
-### Replacing a recipe
-
-Send `/remplace <recipe name>` to the bot:
-
-```
-/remplace Pâtes aux courgettes
-/remplace salade de betteraves
-```
-
-The bot fuzzy-matches the name against the current week's recipes, asks Claude for a season-compatible replacement, updates `menus.json`, and sends back the updated menu.
-
-If the name isn't recognized, the bot lists the current week's recipes and asks you to retry with the exact name.
-
-### Replacing a recipe with a dish of your choice
-
-Send `/remplacepar <recipe name> | <desired dish>` to the bot:
-
-```
-/remplacepar poulet frites | pâtes au pesto
-```
-
-The part before the `|` is fuzzy-matched against the current week's recipes like `/remplace`; the part after is the dish you want instead. Claude bases the replacement on your wish — it may refine the name and fills in the ingredient list — then updates `menus.json` and sends back the updated menu.
-
-## Project layout
-
-```
-agent-menu/
-├── menu_daemon.py      # Telegram daemon (orchestrates generation + modification)
-├── menu_generator.py   # generate_menu() function called by the daemon
-├── helpers.py          # I/O, LLM, Telegram, lock, parsing
-├── prompts.md          # the 4 prompts sent to Claude
-├── seasons.json        # seasonal ingredients by season
-├── menus.json          # history of generated menus
-├── state.json          # Telegram offset (polling persistence)
-├── menu.lock           # lock for writes to menus.json
-└── logs.txt            # logs (1 MB × 3 rotation)
-```
-
-## Logs
-
-Logs are written to `logs.txt` with automatic rotation (1 MB per file, 3 backups kept). Levels and format are defined in `helpers.py:setup_logging`.
+###### State.json
+This file manages the history of the bot. It offsets the entire conversation so that the bot does not see the whole history but only the sent message each time a message is sent.
